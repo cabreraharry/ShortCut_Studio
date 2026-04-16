@@ -1,0 +1,45 @@
+# IDE / editor
+/.idea/
+/.vscode/
+*.swp
+*.swo
+
+# Original gitignored project paths
+/_Archive/
+/tools/
+/build/
+/.Dist/
+/.Patch/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Electron build output
+release-builds/
+dist/
+out/
+
+# SQLite databases (the source of truth — never commit)
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
+src/src/exe/data_log.log
+
+# Archives (legacy snapshots — kept locally, not committed)
+*.rar
+*.zip
+*.7z
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local Claude state (project-scoped .claude/ IS committed; per-user state is not)
+.claude/settings.local.json

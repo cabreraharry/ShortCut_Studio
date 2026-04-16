@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(npm start)",
+      "Bash(npm run package-win)",
+      "Bash(npx electron-rebuild)",
+      "Bash(node -e:*)",
+      "Bash(node --version)",
+      "Bash(npm --version)",
+      "Bash(ls:*)",
+      "Bash(taskkill /F /IM electron.exe)",
+      "Bash(taskkill /F /IM SCL_Restart_PortIDs.exe)",
+      "Read(./**)",
+      "Edit(src/src/**)",
+      "Write(src/src/**)",
+      "Edit(.claude/**)",
+      "Write(.claude/**)",
+      "Edit(CLAUDE.md)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(npm publish)",
+      "Edit(src_orig/**)",
+      "Edit(n/**)",
+      "Write(src/src/db_files/**)"
+    ],
+    "ask": [
+      "Bash(electron-packager:*)",
+      "Bash(npx electron-rebuild)",
+      "Edit(src/src/package.json)",
+      "Edit(src/src/package-lock.json)"
+    ]
+  },
+  "env": {
+    "PROJECT_ROOT_NOTE": "Real code lives in src/src/. Do not edit src_orig/ or n/."
+  }
+}

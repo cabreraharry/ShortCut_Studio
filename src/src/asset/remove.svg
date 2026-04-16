@@ -1,0 +1,9 @@
+<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+	<title>Prev (2)</title>
+	<defs>
+		<image  width="72" height="88" id="img1" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEgAAABYCAMAAABh5UHuAAAAAXNSR0IB2cksfwAAAEVQTFRF////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHmGn6QAAABd0Uk5TAABcq+b/gH8cY6DR82XFEonij0gVxk/k4jOhAAABd0lEQVR4nO3ZbW+CMBAH8B6C6GC6ze37f8A94nA+MO3uymp1o8uu5QUmdwkJFvsL1BbCX1CeAgVYZ00aS2nv930Hsq4u0LChZNTZvD9woVHS2XzYc6EUjyS7s6Yxno3+5EIZbj87pbg1lwMZKac5s/WZf1ROc2t7hEpYByC2prpuoRmsIhiqQi8Jmsc6KFUIlRtFFwfwHCAscIjowiY1TMY4PjfwGHw2D/oNx2kHU/yNyyzcQampaSFc4cS4fo1wlLp9x2kHBa6n2UsUdLfEdQglTqd5yDi7WlQ0pbuWArdo6fQL9VEDhHLf3ZxXibkdBQ/4ybNp4JDvKfqf+gXRvr3Bc/YFEkgggQQSSKC+IeqcCiSQQAIJJNDAIBe0aAZkupqApbaQi37YkIl8VhZyYRTn9dh0NSHUh/3k4jEu1MZiawu5wI4JfQd1Gwu5CPGJAd0fo0Nto9qoULOo1AkUHrNSvKrpr4YWCg1+28BXg3IQP4p2ETTVF6M348SIjdNgAAAAAElFTkSuQmCC"/>
+	</defs>
+	<style>
+	</style>
+	<use id="Layer 6" href="#img1" x="28" y="20"/>
+</svg>
