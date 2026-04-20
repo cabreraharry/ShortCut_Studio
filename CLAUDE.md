@@ -4,160 +4,211 @@ Guidance for Claude Code (claude.ai/code) when working in this repository.
 
 ## Project Overview
 
-**SCL_Admin** — a Windows-only Electron desktop app that acts as the admin/control panel for a larger SCL document-processing system. It manages:
+**SCL Admin** — the unified client-side UI for the SCL document-processing ecosystem. A Windows-first Electron desktop app that gives researchers / academics one place to:
 
-- **Indexed folders** — directories the SCL pipeline scans (with include/exclude semantics)
-- **LLM providers and models** — Ollama (local), OpenAI, Claude (Anthropic), Gemini
-- **OCR processing progress** — view of in-flight OCR jobs
-- **Admin settings** — localhost port, topic threshold, CPU performance threshold
-- **Bundled Windows .exe utilities** — `SCL_ListPorts.exe`, `SCL_Restart_PortIDs.exe`, `SCL_Startup_PortIDs.exe` running background services on ports 18866 / 18877 / 18899
+- Pick which folders to scan for eBooks (PDF, EPUB, MOBI)
+- Configure LLM providers and API keys (Ollama, OpenAI, Claude, Gemini)
+- Browse topics + trigger topic generation + review AI suggestions
+- Monitor progress (local + community peers) via the **Progress Glass**
+- Manage IPFS allocation for peer-shared processing *(stubbed in v1)*
+- Maintain a list of private terms that route matching files to the Private DB
+- Diagnose background workers when something breaks
 
-The app sits in the system tray, persists state in a local SQLite database, and shells out to bundled Win32 binaries.
+The app is mid-**rewrite** from the old Bootstrap+jQuery Electron admin to a modern React + Vite + TypeScript + Tailwind + shadcn/ui stack. Folder is still called `ElectronAdmin2/` — it will be renamed to the final product name at a later milestone.
+
+**Approved plan:** `C:/Users/harrycabrera/.claude/plans/okay-here-are-the-dapper-clarke.md`.
 
 ## Repository Layout
 
-The repo has a confusing nested structure — read this carefully before navigating.
+All active work happens in `src/src/` (legacy nested folder — unchanged from the pre-rewrite layout to keep existing Claude Code skills pointing at the right place).
 
 ```
 ElectronAdmin2/
 ├── src/
-│   └── src/                     <-- ACTIVE codebase (work here)
-│       ├── index.js             Electron main process (~500 lines, all IPC handlers)
-│       ├── preload.js           contextBridge — exposes ipcRenderer + openExternal
-│       ├── renderer.js          UI logic, jQuery, table rendering (~730 lines)
-│       ├── index.html           Single-page UI (4 tabs: Folders / LLMs / Progress / Set Details)
-│       ├── custom.css           App styling
-│       ├── start.js / stop.js   Spawn/kill the bundled .exe services
-│       ├── main.js              Alternative launcher (rarely used)
-│       ├── package.json         npm scripts + dependencies
+│   └── src/                        <-- ACTIVE codebase
+│       ├── package.json            electron-vite + deps
+│       ├── electron.vite.config.ts build config (main/preload/renderer)
+│       ├── tsconfig.json           refs tsconfig.node.json + tsconfig.web.json
+│       ├── tailwind.config.js
+│       ├── components.json         shadcn/ui config
+│       ├── electron-builder.yml    NSIS installer config
+│       ├── resources/
+│       │   ├── icon.ico            app + tray icon
+│       │   └── info-messages.json  Info Section content (TODO: owner supplies)
 │       ├── db_files/
-│       │   ├── loc_adm.db       Primary SQLite DB
-│       │   └── folders.db       Legacy / unused
-│       ├── exe/                 SCL_*.exe Win32 binaries + data_log.log
-│       ├── asset/               Icons + Bootstrap/FontAwesome CSS
-│       ├── node_modules/        Installed (~331 pkgs)
-│       └── release-builds/      electron-packager output
-├── src_orig/src/                Older snapshot — DO NOT EDIT
-├── n/                           Stripped-down sketch — ignore
-├── _Docu/                       PDF docs + design screenshots
-├── db_files/                    Standalone DB copies (loc_adm.db, etc.)
-├── asset/                       Asset duplicates
-└── README.md                    Top-level install/run instructions
+│       │   └── loc_adm.db          SQLite admin DB (gitignored)
+│       ├── exe/                    SCL_Restart_PortIDs.exe + friends (spawned on boot)
+│       ├── release-builds/         electron-builder output
+│       └── src/
+│           ├── main/               Electron main process
+│           │   ├── index.ts        entry: whenReady → init DB + handlers + window + tray
+│           │   ├── window.ts       BrowserWindow creation
+│           │   ├── tray.ts         system tray
+│           │   ├── db/             better-sqlite3 connection + migrations
+│           │   ├── ipc/            one file per domain (folders, llm, topics, progress,
+│           │   │                   ipfs, privacy, diagnostics, settings, mode, app)
+│           │   ├── workers/        supervisor (spawn/restart SCL_Demo .exes)
+│           │   └── execengine/     client.ts (IExecEngineClient) + mock.ts / real.ts
+│           ├── preload/
+│           │   └── index.ts        contextBridge exposing typed ElectronAPI
+│           ├── renderer/           React app
+│           │   ├── index.html      Vite entry
+│           │   ├── main.tsx        React root + QueryClient + HashRouter
+│           │   ├── App.tsx         routes
+│           │   ├── components/
+│           │   │   ├── ui/         shadcn primitives (Button, Card, …)
+│           │   │   └── layout/     AppShell, Sidebar, Header, InfoSection
+│           │   ├── features/       one folder per sidebar section
+│           │   │   ├── dashboard/
+│           │   │   ├── folders/
+│           │   │   ├── topics/
+│           │   │   ├── llm/
+│           │   │   ├── community/
+│           │   │   ├── privacy/
+│           │   │   └── settings/
+│           │   ├── lib/            cn util, window.electronAPI wrapper
+│           │   ├── hooks/
+│           │   ├── stores/         Zustand
+│           │   └── styles/
+│           │       └── globals.css Tailwind + shadcn CSS vars, dark default
+│           └── shared/             used by BOTH main and renderer
+│               ├── ipc-channels.ts channel name constants
+│               ├── types.ts        domain types (FolderRow, Job, ProgressSummary, …)
+│               └── api.ts          ElectronAPI interface (declares window.electronAPI)
+├── src_orig/src/                   OLDER snapshot of pre-rewrite code — DO NOT EDIT
+├── _Docu/                          design PDFs + screenshots (some owner-supplied)
+├── .claude/                        project-scoped agents / skills / commands
+└── README.md
 ```
 
-**Treat `src/src/` as the project root for all real work.** The outer `src/` and `src_orig/` are historical.
+**Treat `src/src/` as the project root.** `src_orig/` is an older snapshot, kept for reference.
 
 ## Run / Build / Package
 
 All commands run from `src/src/`:
 
 ```sh
-npm install            # only if node_modules missing or after dep changes
-npm start              # node start.js && electron .
-npm run package-win    # electron-packager → release-builds/SCL_Admin-win32-x64
+npm install                # installs deps, runs electron-builder install-app-deps (rebuilds better-sqlite3 for Electron)
+npm run dev                # electron-vite dev — HMR for renderer, watch-rebuild for main/preload
+npm run typecheck          # both node + web TS projects
+npm run build              # electron-vite build → out/
+npm run build:win          # build + electron-builder --win (NSIS installer → release-builds/)
+npm test                   # vitest (unit)
+npm run test:e2e           # playwright (E2E against packaged-in-dir build)
 ```
 
-`npm start` first runs `start.js`, which `exec`s `exe\SCL_Restart_PortIDs.exe -c` to bring up the background port services, then launches Electron.
-
-If the native `sqlite3` module fails on app launch (`Error: The module ... was compiled against a different Node.js version`), rebuild it for Electron:
+If `better-sqlite3` errors with "was compiled against a different Node.js version" on first run:
 
 ```sh
 npx electron-rebuild
 ```
 
-There is **no virtualenv / Python involved**. This is pure Node.js + Electron. Don't create a `.venv`.
-
 ## Architecture
 
-### Process model
-- **Main** (`index.js`) — owns the SQLite connection, all IPC handlers, the tray icon, and `dialog.showOpenDialog`.
-- **Preload** (`preload.js`) — context-isolated bridge exposing a thin `window.electron.ipcRenderer` (just `on` / `send`) plus `openExternal`.
-- **Renderer** (`renderer.js`) — jQuery + vanilla DOM. Sends IPC, receives data, renders tables.
+### Process split
 
-Security posture: `contextIsolation: true`, `nodeIntegration: false`, CSP set in `index.html`. Keep it that way.
+- **Main** (`src/main/`) owns the SQLite connection, IPC handlers, worker supervision, tray, window lifecycle. Everything that touches the OS lives here.
+- **Preload** (`src/preload/index.ts`) — context-isolated bridge. Exposes one object, `window.electronAPI`, typed by `@shared/api`. No raw `ipcRenderer` leaks to the renderer.
+- **Renderer** (`src/renderer/`) — React SPA. Never imports `electron`, never hits sqlite3 or the FS. All I/O goes via `window.electronAPI`, wrapped in React Query hooks.
 
-### IPC channels (renderer → main → renderer)
+Security: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: false`, strict CSP in `renderer/index.html`. Keep it that way.
 
-Folders tab:
-- `FF_fetch:data` → `FF_data:fetched`
-- `add-folders` → `folders:added` (then renderer auto-fires `remove:childrenincluded`)
-- `update:path` → `path:updated`
-- `remove:folder` → `folder:removed`
-- `remove:childrenincluded` → `children:cleaned`
+### IPC model
 
-LLM tab:
-- `LLM_fetch:data` → `LLM_data:fetched`
-- `LLM_fetch:Models` (also flips IsDefault) → `LLM_Model_Data:fetched`
-- `LLM_insert:Model` → `LLM_Model_Data:insert`
-- `LLM_Provider:update` (API key)
-- `LLM_Model_Update_Default`
-- `LLM_Model_Update_Name`
+- All calls use `ipcRenderer.invoke` (promise-based), not the legacy `.send` + `.on` one-way pattern.
+- Channel names are **constants** in `src/shared/ipc-channels.ts` — never hardcode strings.
+- Request/response shapes live in `src/shared/types.ts`; the full surface is typed via `ElectronAPI` in `src/shared/api.ts`.
+- Handlers are registered once at startup from `src/main/ipc/index.ts`.
 
-Progress tab:
-- `PG_fetch:data` → `PG_data:fetched`
+### ExecEngine integration
 
-Admin / Set Details:
-- `Admin_data:fetch` → `Admin_data:fetched`
-- `Admin_data:update` → `Admin_data:updated`
+The Electron client's job is to **become the Consumer Peer** for the ExecEngine backend at `D:/ExecEngine/`. ExecEngine's HTTP consumer layer is **not yet implemented** (only internal TCP QUEUE works). For v1, the client depends on the `IExecEngineClient` interface (`src/main/execengine/client.ts`) and uses the mock implementation that returns synthetic peer/progress/IPFS data. Real CP protocol wiring lands in v2.
 
-Misc:
-- `quit:app`, `open-external`, `select-directories` (broadcast on did-finish-load)
+### Workers
+
+Background processing (scan, watchdog, topic generation) lives in **SCL_Demo** (`D:/Client-Side_Project/SCL_Demo/`) as PyInstaller `.exes`:
+`filescanner`, `rescan`, `root_watchdog`, `topic_watchdog`, `gemini_processor`, `postprocessing`.
+
+The Electron main process's `workers/supervisor.ts` spawns + supervises these. Each `.exe` exposes a small FastAPI HTTP interface (via a shared `SCL_Demo/tools/worker_api.py` module, to be added) on a random localhost port so the main process can query `/health` + `/status` instead of parsing stdout.
+
+Auto-restart on crash with backoff; visible in the **Diagnostics** panel in Settings.
 
 ### SQLite schema (`db_files/loc_adm.db`)
 
+Migrations run idempotently on boot (`src/main/db/migrations.ts`). Core tables:
+
 ```sql
-AdminData(RecID PK, Localhost_Port=44999, NumTopicThreshold=10, CPU_Perf_Threshold=50)
-Folder(ID PK, Path, Include 'Y'|'N', ProcRound, LastUpd_CT)
-LLM_Provider(Provider_ID PK, Provider_Name, Has_API_Key, API_Key, API_Host,
+AdminData(RecID PK=1, Localhost_Port=44999, NumTopicThreshold=10, CPU_Perf_Threshold=50)
+Folder(ID PK, Path TEXT, Include 'Y'|'N', ProcRound, LastUpd_CT)
+LLM_Provider(Provider_ID PK, Provider_Name, Has_API_Key, API_Key TEXT, API_Host,
              IsDefault 'Y'|'N', Supported 'Y'|'N', AllowAddModel 'Y'|'N')
 Models(ModelID PK, ProviderID FK, ModelName, ProviderDefault 'Y'|'N')
+OCR_Process(JobID PK, Kind, Status, Label, StartedAt, FinishedAt,
+            ProgressCurrent, ProgressTotal, Error)
+SuperCategories(SuperCategoryID PK, Name UNIQUE)
+ProgressSnapshots(ts PK, cumulativeLocal, cumulativePeer)
+PrivacyTerms(id PK, term UNIQUE, source 'system'|'user')
+LLM_Usage(id PK, providerId, tokensIn, tokensOut, ts)
 ```
 
-Conventions: boolean-ish fields are `VARCHAR(1)` holding `'Y'` / `'N'`. `IsDefault` / `ProviderDefault` are toggled with `CASE WHEN ... THEN 'Y' ELSE 'N' END` so exactly one row wins.
+Conventions: boolean-ish fields remain `VARCHAR` holding `'Y'` / `'N'` (carried over for compatibility). New tables use modern types. `IsDefault` / `ProviderDefault` still toggled with `CASE WHEN ... THEN 'Y' ELSE 'N' END` so exactly one row wins.
 
-Pre-seeded LLM providers: **Ollama** (default, `http://127.0.0.1:11434`, allows custom models), **OpenAI**, **Claude/Anthropic**, **Gemini**.
+**Never expose sqlite3 to the renderer.** All reads/writes flow through IPC handlers.
 
-### Folder include/exclude semantics
-- `Include='Y'` → green row, this directory IS indexed
-- `Include='N'` → orange row with minus icon, this directory is EXCLUDED
-- When adding a folder whose parent is already in the table, it's inserted as `Include='N'` (an exclusion). When adding a top-level folder, it's `Include='Y'`.
-- After adding, `remove:childrenincluded` deletes any existing `Include='Y'` descendants under the new path so exclusions take precedence.
+Pre-seeded LLM providers: Ollama (default), OpenAI, Claude, Gemini.
 
-## Known Bugs / Gotchas
+### Public / Private mode
 
-When touching these areas, fix the bug rather than working around it:
-
-1. **`OCR_Process` table doesn't exist** in `loc_adm.db` (only `AdminData`, `Folder`, `LLM_Provider`, `Models`). Code at `src/src/index.js:185` queries `SELECT * FROM OCR_Process`, so the **Progress** tab silently returns `[]` (or errors). Either create the table or stub the handler.
-2. **`getLastID` case bug** at `src/src/index.js:322` — checks `row.lastID` (lowercase) but resolves `row.LastID + 1`. The lowercase check always fails, falling through to the `LastID + 1` branch. Mostly works but the lastID local variable bookkeeping is off.
-3. **`childRow.id` lowercase** at `src/src/index.js:409` — column is `ID`, so `DELETE FROM Folder WHERE ID = undefined` runs. Children-included cleanup is broken.
-4. **`tray.destroy()` in `quit:app`** assumes `tray` is set; on the `before-quit` path with no window, `mainWindow` may be null when `removeAllListeners` runs (`index.js:484`).
-5. **Path escaping** — folder paths are stored with `\\\\` (double-escaped backslashes). Sorting uses `SUBSTRING(Path,1,1)` for drive letter ordering. Don't normalize paths without checking what reads them downstream.
-6. **API_Key field is `VARCHAR(50)`** — real API keys are longer (OpenAI ~ 50+, Anthropic ~ 100+). Will silently truncate.
-7. **CSP allows `unsafe-inline` for styles** but inline `<script>` would be blocked. Keep all JS in external files.
+A single `DbMode` ('publ' | 'priv') lives in the main process (`src/main/ipc/mode.ts`), toggled from the header. Views that care about mode refetch when it flips — React Query handles this via the `['mode']` key invalidation in `Header.tsx`. The actual per-mode DB (`SCLFolder_Publ.db` / `SCLFolder_Priv.db`) is SCL_Demo's — touched only through IPC handlers that route to the right connection.
 
 ## Coding Conventions
 
-- **Vanilla JS + jQuery + Bootstrap 4.** No build step, no transpilation, no framework.
-- Renderer accesses IPC via `window.electron.ipcRenderer` (NOT `require('electron')` — context isolation).
-- DB access happens **only in main**; never expose `sqlite3` to the renderer.
-- Status flags are `'Y'`/`'N'` strings, not booleans.
-- File paths use Windows backslashes; preserve that.
-- The Bootstrap utility class `d-none` is used everywhere for show/hide. Match that pattern.
-- Logging is `console.log` to the Electron stdout (captured to `error.log` in some launch configs).
+- **TypeScript everywhere.** Strict mode. No `any` without comment.
+- **React 18**, function components + hooks. No class components.
+- **Tailwind v3** utility-first. `cn(...)` helper from `@/lib/utils` for conditional classes.
+- **shadcn/ui** primitives live in `src/renderer/components/ui/`. Add new ones via `npx shadcn@latest add <name>` (reads `components.json`).
+- **Path aliases:** `@/` → `src/renderer/`, `@shared/` → `src/shared/`, `@main/` → `src/main/`. Use them; no `../../../`.
+- **IPC channels:** always import from `@shared/ipc-channels`; never hardcode strings.
+- **IPC handler files** live in `src/main/ipc/<domain>.ts` and export a `register<Domain>Handlers()` function called from `src/main/ipc/index.ts`.
+- **Renderer data-fetching:** React Query. No raw `useEffect` + `useState` for async data.
+- **No `require('electron')` in the renderer.** Use `window.electronAPI`.
+- **Windows paths** in user-facing config (`C:\...`). Don't normalize aggressively.
+- **Status flags** are `'Y'` / `'N'` strings on the existing tables. New tables use text enums or booleans.
+- **Dark mode is default.** `<html class="dark">` ships set; toggle adds/removes `.dark`.
+
+## Skills + Slash Commands
+
+Project-scoped skills/commands live in `.claude/`. Known working ones (after rewrite):
+- `db-backup` — copies `loc_adm.db` to a timestamped backup. **Run before any destructive DB change.**
+- `rebuild-native` — re-runs `npx electron-rebuild` for better-sqlite3 after a node/electron upgrade.
+- `sqlite-query` — read-only SELECT runner against `loc_adm.db`.
+- `package-win` — triggers `npm run build:win`.
+
+Skills whose shell commands are stale (reference the old `index.js` / `jquery` structure) get updated alongside the next related code task.
+
+## Known Gotchas / Watch Items
+
+When touching these, fix the root rather than working around it:
+
+1. **`better-sqlite3` is native.** After any Electron version bump, `npx electron-rebuild`. `postinstall` handles this on fresh installs.
+2. **Existing `loc_adm.db` was seeded with VARCHAR(50) columns** — migrations don't change stored rows, just add missing tables. SQLite treats VARCHAR as TEXT at runtime, so practical width is unlimited; the constraint is cosmetic.
+3. **Info Section messages are placeholders** until the owner supplies real copy. Stored in `resources/info-messages.json` when that lands — for now inlined in `InfoSection.tsx`.
+4. **Progress Glass peer data is synthetic** — produced by `MockExecEngineClient.getProgressSummary()` as a sine wave + linear trend. Swap when CP client is real.
+5. **Worker supervisor is a stub** at scaffold time. The real spawn/restart logic lands in the worker-supervisor task — until then, Diagnostics panel shows all workers as 'stopped'.
 
 ## Working with This Repo
 
-- **Always edit in `src/src/`**, never `src_orig/` or the top-level `src/` shell.
-- After changing native deps (sqlite3), re-run `npx electron-rebuild` from `src/src/`.
-- Don't commit `*.db` (already in `.gitignore`) — but DO commit schema-affecting code.
-- If you need to inspect or modify the SQLite DB, use the helper agent (`db-inspector`) or `node -e` with the already-installed `sqlite3` module.
-- Windows-only assumptions are baked in (`taskkill`, `start <url>`, `.exe` shellouts). Don't try to make this cross-platform without explicit ask.
+- **Always edit in `src/src/`.** Never `src_orig/`.
+- **The plan file** is the source of truth for what ships in v1. Update it if scope changes.
+- **Memory files** live at `C:/Users/harrycabrera/.claude/projects/D--Client-Side-Project/memory/` and persist across sessions.
+- **Don't commit `*.db`** (gitignored). Schema changes in `migrations.ts` ARE committed.
+- **Windows-only assumptions** are baked in (`.exe` workers, `taskkill`, NSIS). Don't attempt cross-platform without explicit ask.
 
 ## Useful Reference Files
 
-- [src/src/index.js](src/src/index.js) — main process, all IPC handlers
-- [src/src/renderer.js](src/src/renderer.js) — UI logic
-- [src/src/preload.js](src/src/preload.js) — security bridge
-- [src/src/index.html](src/src/index.html) — UI structure + CSP
 - [src/src/package.json](src/src/package.json) — scripts + deps
-- [_Docu/](_Docu/) — design PDFs and screenshots
+- [src/src/electron.vite.config.ts](src/src/electron.vite.config.ts) — build pipeline
+- [src/src/src/shared/api.ts](src/src/src/shared/api.ts) — full IPC surface typed
+- [src/src/src/main/ipc/index.ts](src/src/src/main/ipc/index.ts) — handler registration
+- [src/src/src/renderer/App.tsx](src/src/src/renderer/App.tsx) — route config
+- [_Docu/](_Docu/) — design PDFs + screenshots (owner-supplied)

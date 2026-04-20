@@ -1,0 +1,40 @@
+appId: com.scl.admin
+productName: SCL Admin
+copyright: Copyright © 2026
+
+directories:
+  output: release-builds
+  buildResources: resources
+
+files:
+  - out/**/*
+  - package.json
+
+extraResources:
+  - from: exe
+    to: exe
+    filter: ['**/*']
+
+asarUnpack:
+  - resources/**
+  - node_modules/better-sqlite3/**
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: resources/icon.ico
+  artifactName: ${productName}-Setup-${version}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: true
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: SCL Admin
+
+publish:
+  provider: generic
+  url: https://example.invalid/updates/
