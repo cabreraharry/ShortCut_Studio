@@ -15,7 +15,7 @@ Wraps `npm run package-win`, which is `electron-packager . SCL_Admin --platform=
 ## Run
 
 ```bash
-cd "d:/Client-Side Project/ElectronAdmin2/src/src" && npm run package-win
+cd "d:/Client-Side_Project/ElectronAdmin2/src/src" && npm run package-win
 ```
 
 Run with `run_in_background: true` if the user wants logs. First-time runs download Electron prebuilts (~80MB) and take several minutes.

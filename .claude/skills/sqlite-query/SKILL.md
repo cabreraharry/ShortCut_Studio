@@ -14,7 +14,7 @@ The user gives you a SQL string as the argument. Refuse anything that contains `
 ## How to run
 
 ```bash
-cd "d:/Client-Side Project/ElectronAdmin2/src/src" && node -e "
+cd "d:/Client-Side_Project/ElectronAdmin2/src/src" && node -e "
 const sqlite3 = require('sqlite3').verbose();
 const db = new sqlite3.Database('db_files/loc_adm.db');
 db.all(\`<SQL_HERE>\`, (err, rows) => {

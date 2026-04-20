@@ -15,7 +15,7 @@ description: Rebuild the native sqlite3 binding for the project's bundled Electr
 ## How to run
 
 ```bash
-cd "d:/Client-Side Project/ElectronAdmin2/src/src" && npx electron-rebuild
+cd "d:/Client-Side_Project/ElectronAdmin2/src/src" && npx electron-rebuild
 ```
 
 This reads `package.json`'s `electron` devDep, downloads matching headers, and rebuilds every native module against that ABI. Takes 30–90 seconds.
@@ -23,7 +23,7 @@ This reads `package.json`'s `electron` devDep, downloads matching headers, and r
 ## Verify
 
 ```bash
-ls "d:/Client-Side Project/ElectronAdmin2/src/src/node_modules/sqlite3/build/Release/node_sqlite3.node"
+ls "d:/Client-Side_Project/ElectronAdmin2/src/src/node_modules/sqlite3/build/Release/node_sqlite3.node"
 ```
 
 The file should exist and have a recent mtime.
