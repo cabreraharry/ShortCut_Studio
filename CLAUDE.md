@@ -2,6 +2,12 @@
 
 Guidance for Claude Code (claude.ai/code) when working in this repository.
 
+## 📘 New session? Start here
+
+Comprehensive handoff material from the 2026-04-20 rewrite session lives at **[docs/claude-handoff/](docs/claude-handoff/README.md)**. If you're a fresh Claude session (or a new human collaborator) opening this repo for the first time, read those docs first — they capture every decision, feature state, and watch-item so you don't re-litigate.
+
+Minimum reading order: `docs/claude-handoff/README.md` → `01-conversation-log.md` → `03-key-decisions.md` → this file.
+
 ## Project Overview
 
 **SCL Admin** — the unified client-side UI for the SCL document-processing ecosystem. A Windows-first Electron desktop app that gives researchers / academics one place to:
