@@ -1,0 +1,46 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "dev",
+      "type": "npm",
+      "script": "dev",
+      "path": "src/src",
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true },
+      "detail": "electron-vite dev — HMR renderer + watch-rebuild main/preload"
+    },
+    {
+      "label": "typecheck",
+      "type": "npm",
+      "script": "typecheck",
+      "path": "src/src",
+      "problemMatcher": ["$tsc"],
+      "detail": "tsc --noEmit on both node and web projects"
+    },
+    {
+      "label": "build",
+      "type": "npm",
+      "script": "build",
+      "path": "src/src",
+      "problemMatcher": ["$tsc"],
+      "detail": "electron-vite build → out/"
+    },
+    {
+      "label": "build:win (installer)",
+      "type": "npm",
+      "script": "build:win",
+      "path": "src/src",
+      "problemMatcher": [],
+      "detail": "Produce NSIS installer in release-builds/ — takes 2-5 minutes"
+    },
+    {
+      "label": "rebuild better-sqlite3",
+      "type": "shell",
+      "command": "npx electron-rebuild -f -w better-sqlite3",
+      "options": { "cwd": "${workspaceFolder}/src/src" },
+      "problemMatcher": [],
+      "detail": "Run if the app complains about ABI mismatch on launch"
+    }
+  ]
+}

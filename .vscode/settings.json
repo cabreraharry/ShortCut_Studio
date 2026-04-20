@@ -1,0 +1,36 @@
+{
+  "editor.formatOnSave": false,
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "editor.rulers": [100],
+  "files.eol": "\n",
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/out": true,
+    "**/release-builds/win-unpacked": true,
+    "**/*.tsbuildinfo": true,
+    "src_orig": true,
+    "asset.rar": true,
+    "n": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/out": true,
+    "**/release-builds": true,
+    "**/dist": true,
+    "src_orig": true,
+    "**/*.tsbuildinfo": true
+  },
+  "typescript.tsdk": "src/src/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "tailwindCSS.experimental.classRegex": [
+    ["cva\\(([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]"],
+    ["cn\\(([^)]*)\\)", "[\"'`]([^\"'`]*).*?[\"'`]"]
+  ],
+  "tailwindCSS.includeLanguages": {
+    "typescript": "javascript",
+    "typescriptreact": "javascript"
+  },
+  "[typescript]": { "editor.defaultFormatter": "vscode.typescript-language-features" },
+  "[typescriptreact]": { "editor.defaultFormatter": "vscode.typescript-language-features" }
+}

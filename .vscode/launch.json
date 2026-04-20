@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Dev (electron-vite)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/src/src",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Smoke-test packaged app",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}/src/src",
+      "program": "${workspaceFolder}/src/src/release-builds/win-unpacked/SCL Admin.exe",
+      "console": "integratedTerminal"
+    }
+  ]
+}
