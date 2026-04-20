@@ -1,39 +1,198 @@
+import { spawn, type ChildProcess } from 'node:child_process'
+import { net } from 'electron'
 import type { WorkerStatus } from '@shared/types'
+import {
+  SUPERVISED_WORKERS,
+  resolveWorkerExecutable,
+  type WorkerConfig
+} from './config'
 
 /**
- * Worker supervisor — stub for v1 scaffold.
+ * Long-running worker supervisor.
  *
- * The real implementation spawns SCL_Demo's PyInstaller .exes (filescanner,
- * rescan, watchdogs, gemini_processor, postprocessing), supervises their
- * lifecycle, and queries their FastAPI /health + /status endpoints.
+ * Responsibilities:
+ * - Start auto-start workers when the app boots
+ * - Capture stdout/stderr and keep a rolling log buffer
+ * - Restart on unexpected exit, with exponential backoff (max retries)
+ * - Poll each worker's FastAPI /health endpoint to detect hung processes
+ * - Expose status + log tail for the Diagnostics panel
  *
- * Full implementation lands in the worker-supervisor task.
+ * The Python-side FastAPI wrapper lives at SCL_Demo/tools/worker_api.py.
+ * Workers that haven't adopted the wrapper yet still work — they just
+ * never respond to health pings, so status is inferred purely from
+ * whether the child process is alive.
  */
-const workers: WorkerStatus[] = [
-  { name: 'filescanner', status: 'stopped', restartCount: 0 },
-  { name: 'rescan', status: 'stopped', restartCount: 0 },
-  { name: 'root_watchdog', status: 'stopped', restartCount: 0 },
-  { name: 'topic_watchdog', status: 'stopped', restartCount: 0 },
-  { name: 'gemini_processor', status: 'stopped', restartCount: 0 },
-  { name: 'postprocessing', status: 'stopped', restartCount: 0 }
-]
+
+interface WorkerHandle {
+  config: WorkerConfig
+  child: ChildProcess | null
+  status: WorkerStatus['status']
+  lastHealthCheck?: number
+  exitCode?: number
+  restartCount: number
+  logBuffer: string[]
+}
+
+const LOG_RING = 400
+const MAX_RESTART_ATTEMPTS = 5
+const HEALTH_POLL_MS = 10_000
+
+const handles = new Map<string, WorkerHandle>()
+let healthInterval: NodeJS.Timeout | null = null
+
+function initHandle(cfg: WorkerConfig): WorkerHandle {
+  return {
+    config: cfg,
+    child: null,
+    status: 'stopped',
+    restartCount: 0,
+    logBuffer: []
+  }
+}
+
+function pushLog(handle: WorkerHandle, line: string) {
+  handle.logBuffer.push(line)
+  if (handle.logBuffer.length > LOG_RING) {
+    handle.logBuffer.splice(0, handle.logBuffer.length - LOG_RING)
+  }
+}
+
+function spawnWorker(handle: WorkerHandle): void {
+  const cfg = handle.config
+  const exe = resolveWorkerExecutable(cfg)
+  if (!exe) {
+    pushLog(
+      handle,
+      `[supervisor] skipping ${cfg.name} — executable not found. Set SCL_WORKERS_DIR or build SCL_Demo/_exe/${cfg.executable}.`
+    )
+    handle.status = 'stopped'
+    return
+  }
+
+  const env = { ...process.env, WORKER_HEALTH_PORT: String(cfg.healthPort) }
+  const child = spawn(exe, cfg.args, { env, windowsHide: true })
+  handle.child = child
+  handle.status = 'running'
+  pushLog(handle, `[supervisor] started ${cfg.name} (pid=${child.pid})`)
+
+  child.stdout?.on('data', (chunk: Buffer) => {
+    for (const line of chunk.toString().split(/\r?\n/)) {
+      if (line.trim()) pushLog(handle, line)
+    }
+  })
+  child.stderr?.on('data', (chunk: Buffer) => {
+    for (const line of chunk.toString().split(/\r?\n/)) {
+      if (line.trim()) pushLog(handle, line)
+    }
+  })
+  child.on('exit', (code) => {
+    handle.child = null
+    handle.exitCode = code ?? undefined
+    const crashed = code !== 0 && code !== null
+    handle.status = crashed ? 'crashed' : 'stopped'
+    pushLog(handle, `[supervisor] ${cfg.name} exited (code=${code})`)
+    if (crashed && handle.restartCount < MAX_RESTART_ATTEMPTS) {
+      const delay = Math.min(30_000, 2_000 * Math.pow(2, handle.restartCount))
+      handle.restartCount += 1
+      pushLog(handle, `[supervisor] restarting in ${delay}ms (attempt ${handle.restartCount})`)
+      setTimeout(() => spawnWorker(handle), delay)
+    } else if (crashed) {
+      pushLog(handle, `[supervisor] giving up on ${cfg.name} after ${handle.restartCount} restarts`)
+    }
+  })
+}
+
+async function pingHealth(handle: WorkerHandle): Promise<void> {
+  if (handle.status !== 'running' || !handle.child) return
+  const port = handle.config.healthPort
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const req = net.request({
+        method: 'GET',
+        url: `http://127.0.0.1:${port}/health`
+      })
+      const timer = setTimeout(() => {
+        req.abort()
+        reject(new Error('timeout'))
+      }, 3_000)
+      req.on('response', (res) => {
+        res.on('data', () => {})
+        res.on('end', () => {
+          clearTimeout(timer)
+          if (res.statusCode && res.statusCode < 500) resolve()
+          else reject(new Error(`HTTP ${res.statusCode}`))
+        })
+      })
+      req.on('error', (err) => {
+        clearTimeout(timer)
+        reject(err)
+      })
+      req.end()
+    })
+    handle.lastHealthCheck = Date.now()
+  } catch {
+    // Endpoint not responding — worker may not have adopted the FastAPI
+    // wrapper yet. Don't treat as crash unless the process itself has died.
+  }
+}
 
 export function startWorkerSupervisor(): void {
-  // Intentionally a no-op for v1 scaffold. Implemented in dedicated task.
+  for (const cfg of SUPERVISED_WORKERS) {
+    const handle = initHandle(cfg)
+    handles.set(cfg.name, handle)
+    if (cfg.autoStart) spawnWorker(handle)
+  }
+
+  if (healthInterval) clearInterval(healthInterval)
+  healthInterval = setInterval(() => {
+    for (const handle of handles.values()) pingHealth(handle)
+  }, HEALTH_POLL_MS)
 }
 
 export function stopAllWorkers(): void {
-  // no-op
+  if (healthInterval) {
+    clearInterval(healthInterval)
+    healthInterval = null
+  }
+  for (const handle of handles.values()) {
+    if (handle.child && !handle.child.killed) {
+      handle.child.kill()
+    }
+    handle.status = 'stopped'
+  }
 }
 
 export function getWorkerStatuses(): WorkerStatus[] {
-  return workers
+  const out: WorkerStatus[] = []
+  for (const handle of handles.values()) {
+    out.push({
+      name: handle.config.name,
+      pid: handle.child?.pid,
+      status: handle.status,
+      lastHealthCheck: handle.lastHealthCheck,
+      exitCode: handle.exitCode,
+      restartCount: handle.restartCount
+    })
+  }
+  return out
 }
 
-export async function restartWorker(_name: string): Promise<void> {
-  // no-op
+export async function restartWorker(name: string): Promise<void> {
+  const handle = handles.get(name)
+  if (!handle) return
+  if (handle.child && !handle.child.killed) {
+    handle.child.kill()
+    // spawn happens via the 'exit' handler if crashed — but here it's a
+    // deliberate restart, so kick off ourselves after a short delay.
+    await new Promise((r) => setTimeout(r, 500))
+  }
+  handle.restartCount = 0
+  spawnWorker(handle)
 }
 
-export async function tailWorkerLog(_name: string, _lines: number): Promise<string> {
-  return '(worker supervisor not yet implemented — logs will appear here after the worker-supervisor task)'
+export async function tailWorkerLog(name: string, lines: number): Promise<string> {
+  const handle = handles.get(name)
+  if (!handle) return `(no worker named ${name})`
+  const n = Math.max(1, Math.min(LOG_RING, lines))
+  return handle.logBuffer.slice(-n).join('\n')
 }

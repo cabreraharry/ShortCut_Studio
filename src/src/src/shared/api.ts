@@ -1,6 +1,7 @@
 import type {
   AppSettings,
   DbMode,
+  FileTypeFilter,
   FolderRow,
   IpfsStatus,
   Job,
@@ -10,8 +11,9 @@ import type {
   PrivacyTerm,
   ProgressHistoryPoint,
   ProgressSummary,
+  SuperCategory,
   TimeRange,
-  Topic,
+  TopicListResult,
   TopicReviewItem,
   WorkerStatus
 } from './types'
@@ -37,6 +39,12 @@ export interface ElectronAPI {
     updatePath: (id: number, newPath: string) => Promise<void>
     pickDirectory: () => Promise<string[]>
   }
+  fileTypes: {
+    list: () => Promise<FileTypeFilter[]>
+    toggle: (extension: string, enabled: boolean) => Promise<void>
+    add: (extension: string, label: string) => Promise<FileTypeFilter>
+    remove: (extension: string) => Promise<void>
+  }
   llm: {
     listProviders: () => Promise<LlmProvider[]>
     updateKey: (providerId: number, key: string) => Promise<void>
@@ -55,10 +63,18 @@ export interface ElectronAPI {
     history: (range: TimeRange) => Promise<ProgressHistoryPoint[]>
   }
   topics: {
-    list: () => Promise<Topic[]>
+    list: () => Promise<TopicListResult>
     generate: (folderId?: number) => Promise<{ jobId: string }>
     review: () => Promise<TopicReviewItem[]>
     approve: (items: TopicReviewItem[]) => Promise<void>
+  }
+  superCategories: {
+    list: () => Promise<SuperCategory[]>
+    create: (name: string) => Promise<SuperCategory>
+    rename: (id: number, name: string) => Promise<void>
+    remove: (id: number) => Promise<void>
+    assign: (topicName: string, superCategoryId: number) => Promise<void>
+    unassign: (topicName: string) => Promise<void>
   }
   ipfs: {
     status: () => Promise<IpfsStatus>

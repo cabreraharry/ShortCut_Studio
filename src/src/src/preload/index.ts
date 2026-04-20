@@ -20,6 +20,15 @@ const api: ElectronAPI = {
       ipcRenderer.invoke(IpcChannel.FoldersUpdatePath, id, newPath),
     pickDirectory: () => ipcRenderer.invoke(IpcChannel.FoldersPickDirectory)
   },
+  fileTypes: {
+    list: () => ipcRenderer.invoke(IpcChannel.FileTypesList),
+    toggle: (extension, enabled) =>
+      ipcRenderer.invoke(IpcChannel.FileTypesToggle, extension, enabled),
+    add: (extension, label) =>
+      ipcRenderer.invoke(IpcChannel.FileTypesAdd, extension, label),
+    remove: (extension) =>
+      ipcRenderer.invoke(IpcChannel.FileTypesRemove, extension)
+  },
   llm: {
     listProviders: () => ipcRenderer.invoke(IpcChannel.LlmListProviders),
     updateKey: (providerId, key) =>
@@ -48,6 +57,21 @@ const api: ElectronAPI = {
       ipcRenderer.invoke(IpcChannel.TopicsGenerate, folderId),
     review: () => ipcRenderer.invoke(IpcChannel.TopicsReview),
     approve: (items) => ipcRenderer.invoke(IpcChannel.TopicsApprove, items)
+  },
+  superCategories: {
+    list: () => ipcRenderer.invoke(IpcChannel.SuperCategoriesList),
+    create: (name) => ipcRenderer.invoke(IpcChannel.SuperCategoriesCreate, name),
+    rename: (id, name) =>
+      ipcRenderer.invoke(IpcChannel.SuperCategoriesRename, id, name),
+    remove: (id) => ipcRenderer.invoke(IpcChannel.SuperCategoriesRemove, id),
+    assign: (topicName, superCategoryId) =>
+      ipcRenderer.invoke(
+        IpcChannel.SuperCategoriesAssign,
+        topicName,
+        superCategoryId
+      ),
+    unassign: (topicName) =>
+      ipcRenderer.invoke(IpcChannel.SuperCategoriesUnassign, topicName)
   },
   ipfs: {
     status: () => ipcRenderer.invoke(IpcChannel.IpfsStatus),

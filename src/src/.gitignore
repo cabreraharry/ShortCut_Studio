@@ -14,3 +14,4 @@ db_files/*.backup.*.db
 .env
 .env.local
 .env.*.local
+tsconfig.*.tsbuildinfo

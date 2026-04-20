@@ -82,6 +82,18 @@ export function runMigrations(): void {
       tokensOut INTEGER NOT NULL DEFAULT 0,
       ts INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS FileTypeFilters (
+      extension TEXT PRIMARY KEY,
+      label TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      sortOrder INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS TopicSuperCategoryMap (
+      topicName TEXT PRIMARY KEY,
+      superCategoryId INTEGER NOT NULL REFERENCES SuperCategories(SuperCategoryID) ON DELETE CASCADE
+    );
   `)
 
   // Seed admin settings row if missing
@@ -110,5 +122,20 @@ export function runMigrations(): void {
     const defaults = ['personal', 'private', 'confidential', 'draft', 'unreleased', 'ssn', 'passport']
     const insert = db.prepare('INSERT INTO PrivacyTerms (term, source) VALUES (?, ?)')
     for (const term of defaults) insert.run(term, 'system')
+  }
+
+  // Seed default file-type filters
+  const fileTypeCount = db.prepare('SELECT COUNT(*) AS c FROM FileTypeFilters').get() as {
+    c: number
+  }
+  if (fileTypeCount.c === 0) {
+    const seed = db.prepare(
+      'INSERT INTO FileTypeFilters (extension, label, enabled, sortOrder) VALUES (?, ?, ?, ?)'
+    )
+    seed.run('.pdf', 'PDF', 1, 1)
+    seed.run('.epub', 'EPUB', 1, 2)
+    seed.run('.mobi', 'MOBI', 1, 3)
+    seed.run('.azw3', 'AZW3', 0, 4)
+    seed.run('.djvu', 'DJVU', 0, 5)
   }
 }

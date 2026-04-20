@@ -14,6 +14,10 @@ export const IpcChannel = {
   FoldersRemove: 'folders:remove',
   FoldersUpdatePath: 'folders:update-path',
   FoldersPickDirectory: 'folders:pick-directory',
+  FileTypesList: 'file-types:list',
+  FileTypesToggle: 'file-types:toggle',
+  FileTypesAdd: 'file-types:add',
+  FileTypesRemove: 'file-types:remove',
 
   // LLM providers
   LlmListProviders: 'llm:list-providers',
@@ -37,6 +41,12 @@ export const IpcChannel = {
   TopicsGenerate: 'topics:generate',
   TopicsReview: 'topics:review',
   TopicsApprove: 'topics:approve',
+  SuperCategoriesList: 'super-categories:list',
+  SuperCategoriesCreate: 'super-categories:create',
+  SuperCategoriesRename: 'super-categories:rename',
+  SuperCategoriesRemove: 'super-categories:remove',
+  SuperCategoriesAssign: 'super-categories:assign',
+  SuperCategoriesUnassign: 'super-categories:unassign',
 
   // IPFS / community (stubbed)
   IpfsStatus: 'ipfs:status',

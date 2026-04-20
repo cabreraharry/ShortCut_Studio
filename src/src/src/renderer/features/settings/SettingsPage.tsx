@@ -1,27 +1,283 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import {
+  FolderOpen,
+  Save,
+  HeartPulse,
+  RotateCw,
+  CheckCircle2,
+  AlertCircle
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { api } from '@/lib/api'
+import type { AppSettings, WorkerStatus } from '@shared/types'
 
 export default function SettingsPage() {
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="text-sm text-muted-foreground">
-          Paths, theme, diagnostics.
+          Paths, admin values, and worker diagnostics.
         </p>
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>Settings</CardTitle>
+      <PathsCard />
+      <AdminCard />
+      <DiagnosticsCard />
+    </div>
+  )
+}
+
+function PathsCard() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <FolderOpen className="h-4 w-4" />
+          Paths
+        </CardTitle>
+        <CardDescription>
+          Where SCL stores your cache and search folder. Move them to another drive if space runs tight.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <PathRow
+          label="Hidden content folder"
+          description="Thumbnails, extracted metadata, IPFS-staging content."
+          currentValue="%AppData%\SCL_Admin\content"
+        />
+        <PathRow
+          label="Desktop search folder"
+          description="Shortcuts organized by topic. You can use OS search inside."
+          currentValue="%UserProfile%\Desktop\_SCL_"
+        />
+      </CardContent>
+    </Card>
+  )
+}
+
+function PathRow({
+  label,
+  description,
+  currentValue
+}: {
+  label: string
+  description: string
+  currentValue: string
+}) {
+  return (
+    <div className="rounded-md border border-border p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="text-sm font-medium">{label}</div>
+          <div className="text-xs text-muted-foreground">{description}</div>
+        </div>
+        <Button variant="outline" size="sm" disabled>
+          Move…
+        </Button>
+      </div>
+      <div className="mt-2 rounded bg-muted/30 px-2 py-1 font-mono text-xs text-muted-foreground">
+        {currentValue}
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Move requires full implementation (copies content + updates shortcuts + app restart). Wired up in a later task.
+      </p>
+    </div>
+  )
+}
+
+function AdminCard() {
+  const qc = useQueryClient()
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => api.settings.get()
+  })
+  const update = useMutation({
+    mutationFn: (patch: Partial<AppSettings>) => api.settings.update(patch),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] })
+  })
+  const [draft, setDraft] = useState<Partial<AppSettings>>({})
+
+  useEffect(() => {
+    if (settings) setDraft(settings)
+  }, [settings])
+
+  const hasChanges =
+    settings &&
+    (draft.localhostPort !== settings.localhostPort ||
+      draft.numTopicThreshold !== settings.numTopicThreshold ||
+      draft.cpuPerfThreshold !== settings.cpuPerfThreshold)
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Admin values</CardTitle>
+        <CardDescription>
+          Power-user knobs. Defaults are sane; change only if you know what you're doing.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <Field
+          label="Localhost port"
+          description="ExecEngine queue bus (default 44999)"
+          value={draft.localhostPort?.toString() ?? ''}
+          onChange={(v) => setDraft({ ...draft, localhostPort: Number(v) || 0 })}
+        />
+        <Field
+          label="Topic threshold"
+          description="Minimum files before a topic is auto-created"
+          value={draft.numTopicThreshold?.toString() ?? ''}
+          onChange={(v) => setDraft({ ...draft, numTopicThreshold: Number(v) || 0 })}
+        />
+        <Field
+          label="CPU threshold (%)"
+          description="Background work pauses when CPU load is above this"
+          value={draft.cpuPerfThreshold?.toString() ?? ''}
+          onChange={(v) => setDraft({ ...draft, cpuPerfThreshold: Number(v) || 0 })}
+        />
+        <div className="flex justify-end">
+          <Button
+            disabled={!hasChanges || update.isPending}
+            onClick={() => update.mutate(draft)}
+          >
+            <Save className="mr-2 h-4 w-4" />
+            Save
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function Field({
+  label,
+  description,
+  value,
+  onChange
+}: {
+  label: string
+  description: string
+  value: string
+  onChange: (v: string) => void
+}) {
+  return (
+    <div className="grid gap-1 md:grid-cols-[240px_1fr] md:items-center">
+      <div>
+        <div className="text-sm font-medium">{label}</div>
+        <div className="text-xs text-muted-foreground">{description}</div>
+      </div>
+      <Input value={value} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  )
+}
+
+function DiagnosticsCard() {
+  const qc = useQueryClient()
+  const { data: workers = [] } = useQuery({
+    queryKey: ['workers'],
+    queryFn: () => api.diagnostics.workers(),
+    refetchInterval: 5000
+  })
+  const restart = useMutation({
+    mutationFn: (name: string) => api.diagnostics.restartWorker(name),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['workers'] })
+  })
+  const [open, setOpen] = useState(false)
+  const [log, setLog] = useState<Record<string, string>>({})
+
+  const fetchLog = async (name: string) => {
+    const txt = await api.diagnostics.tailLog(name, 200)
+    setLog((prev) => ({ ...prev, [name]: txt }))
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <HeartPulse className="h-4 w-4" />
+            Diagnostics
+          </CardTitle>
           <CardDescription>
-            Movable folders, diagnostics, admin settings — built in the Settings task.
+            Background worker status. Tuck this panel away unless something looks wrong.
           </CardDescription>
-        </CardHeader>
+        </div>
+        <Button variant="ghost" size="sm" onClick={() => setOpen((v) => !v)}>
+          {open ? 'Hide' : 'Show'}
+        </Button>
+      </CardHeader>
+      {open && (
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Placeholder — feature built in a later task.
-          </p>
+          <div className="divide-y divide-border rounded-md border border-border">
+            {workers.map((w) => (
+              <WorkerRow
+                key={w.name}
+                worker={w}
+                onRestart={() => restart.mutate(w.name)}
+                onTail={() => fetchLog(w.name)}
+                logText={log[w.name]}
+              />
+            ))}
+          </div>
         </CardContent>
-      </Card>
+      )}
+    </Card>
+  )
+}
+
+function WorkerRow({
+  worker,
+  onRestart,
+  onTail,
+  logText
+}: {
+  worker: WorkerStatus
+  onRestart: () => void
+  onTail: () => void
+  logText?: string
+}) {
+  const tone =
+    worker.status === 'running'
+      ? 'text-emerald-400'
+      : worker.status === 'crashed'
+        ? 'text-destructive'
+        : 'text-muted-foreground'
+  const Icon =
+    worker.status === 'running'
+      ? CheckCircle2
+      : worker.status === 'crashed'
+        ? AlertCircle
+        : HeartPulse
+
+  return (
+    <div className="flex flex-col gap-2 px-4 py-3 text-sm">
+      <div className="flex items-center gap-3">
+        <Icon className={`h-4 w-4 ${tone}`} />
+        <div className="flex-1">
+          <div className="font-mono text-xs font-semibold">{worker.name}</div>
+          <div className="text-xs text-muted-foreground">
+            status: <Badge variant="outline">{worker.status}</Badge>
+            {worker.restartCount > 0 && (
+              <span className="ml-2">restarts: {worker.restartCount}</span>
+            )}
+          </div>
+        </div>
+        <Button variant="ghost" size="sm" onClick={onTail}>
+          Tail log
+        </Button>
+        <Button variant="outline" size="sm" onClick={onRestart}>
+          <RotateCw className="mr-1 h-3 w-3" />
+          Restart
+        </Button>
+      </div>
+      {logText && (
+        <pre className="max-h-40 overflow-auto rounded bg-muted/30 p-2 font-mono text-[10px] leading-tight text-muted-foreground">
+          {logText}
+        </pre>
+      )}
     </div>
   )
 }

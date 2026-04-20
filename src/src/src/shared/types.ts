@@ -15,6 +15,12 @@ export interface FolderRow {
   lastUpdCt: number
 }
 
+export interface FileTypeFilter {
+  extension: string    // e.g. '.pdf'
+  label: string        // e.g. 'PDF'
+  enabled: boolean
+}
+
 export interface LlmProvider {
   providerId: number
   providerName: string
@@ -79,6 +85,17 @@ export interface Topic {
   manualGenerated: 'Y' | 'N'
   superCategoryId?: number
   fileCount: number
+}
+
+export interface SuperCategory {
+  superCategoryId: number
+  name: string
+  topicNames: string[]
+}
+
+export interface TopicListResult {
+  topics: Topic[]
+  scanDbMissing: boolean
 }
 
 export interface TopicReviewItem {
