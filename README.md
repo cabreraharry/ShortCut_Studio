@@ -1,34 +1,37 @@
-[![Electron Logo](https://electronjs.org/images/electron-logo.svg)](https://electronjs.org)
+# ShortCut Studio
 
-## Installation
+Unified client-side UI for the SCL document-processing ecosystem. Windows-first Electron desktop app for researchers / academics: scan eBook libraries, configure LLM providers, manage topics + super-categories, monitor progress against the peer network, and route private content to a separate DB.
 
-To install prebuilt Electron binaries, use [`npm`](https://docs.npmjs.com/).
-The preferred method is to install Electron as a development dependency in your
-app:
+> **Heads up.** The on-disk folder is still `ElectronAdmin2/` for legacy reasons — it'll be renamed to `ShortCut_Studio/` in a future cleanup. The product itself ships as **ShortCut Studio**.
 
-```sh
-npm install electron --save-dev
-```
+## Where the code lives
 
-## Run Project
+All active code is under [`src/src/`](src/src/). Treat that as the project root.
+
+## Quick start
 
 ```sh
-npm install
-npm start
+cd src/src
+npm install              # also rebuilds better-sqlite3 for Electron via postinstall
+npm run dev              # electron-vite dev server (HMR for renderer)
+npm run typecheck        # both node + web TS projects
+npm run build            # electron-vite build → out/
+npm run build:win        # full Windows NSIS installer → release-builds/
+npm run storybook        # Playwright-driven page screenshots → storybook/
 ```
 
-## Build(Windows)
+If `better-sqlite3` errors with *"compiled against a different Node.js version"* on first run, do `npx electron-rebuild` from `src/src/`.
 
-```sh
-npm run package-win
-```
+## Stack
 
+Electron 33 · Vite 5 · React 18 · TypeScript · Tailwind v3 · shadcn/ui · React Query · Zustand · better-sqlite3
 
-## Development Tools
+## Documentation
 
-You can add this code to index.js for debugging.
+- [`CLAUDE.md`](CLAUDE.md) — the canonical project guide for both human collaborators and Claude Code sessions: architecture, IPC model, DB schema, conventions, gotchas.
+- [`docs/claude-handoff/`](docs/claude-handoff/) — narrative session-handoff material (decisions, features built, pending work, how-to-continue).
+- [`_Docu/`](_Docu/) — owner-supplied design references (PDFs, screenshots).
 
-```sh
-mainWindow.webContents.openDevTools();
-```
+## License
 
+MIT. See [`src/src/package.json`](src/src/package.json).

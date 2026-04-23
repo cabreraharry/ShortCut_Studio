@@ -15,15 +15,14 @@ Custom agents, skills, slash commands, and rules that ship with this repo so any
 │   ├── electron-runner.md  starts/stops the Electron app for manual smoke tests
 │   └── code-reviewer.md    independent second-opinion review of a diff
 ├── skills/
-│   ├── sqlite-query/SKILL.md   one-shot read-only SQL via the bundled sqlite3 npm
+│   ├── sqlite-query/SKILL.md   one-shot read-only SQL via better-sqlite3
 │   ├── rebuild-native/SKILL.md `npx electron-rebuild` after Electron/Node bumps
-│   ├── package-win/SKILL.md    `npm run package-win` with pre-flight checks
+│   ├── package-win/SKILL.md    `npm run build:win` with pre-flight checks
 │   └── db-backup/SKILL.md      timestamped copy of loc_adm.db before any DML
 └── commands/
     ├── dev.md             /dev             → start the app, tail logs
     ├── db.md              /db [SQL]        → inspect the SQLite DB
-    ├── audit-ipc.md       /audit-ipc       → run the ipc-auditor agent
-    └── fix-known-bugs.md  /fix-known-bugs  → walk the four documented bugs, fix per-user-approval
+    └── audit-ipc.md       /audit-ipc       → run the ipc-auditor agent
 ```
 
 ## How to use
@@ -39,7 +38,7 @@ Custom agents, skills, slash commands, and rules that ship with this repo so any
 - This codebase has a **deeply nested `src/src/` layout** that's easy to misnavigate. The rules and agents pin all work to the right place.
 - **SQLite is the source of truth** for every screen. A read-only inspector (`db-inspector` + `sqlite-query` skill + `/db`) gets traction faster than ad-hoc `node -e` calls every time.
 - **Electron IPC silently no-ops on typos** — `ipc-auditor` catches drift between main / preload / renderer.
-- **Native sqlite3 vs Electron's bundled Node ABI** is the single most common breakage; `rebuild-native` and `electron-runner` cover it.
+- **Native better-sqlite3 vs Electron's bundled Node ABI** is the single most common breakage; `rebuild-native` and `electron-runner` cover it.
 
 ## Adding new tools
 
