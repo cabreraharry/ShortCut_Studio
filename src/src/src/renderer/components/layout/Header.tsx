@@ -10,7 +10,7 @@ import { AboutDialog } from './AboutDialog'
 import type { DataSource, DataSourceState } from '@shared/types'
 
 function useTheme() {
-  const [isDark, setIsDark] = useState(true)
+  const [isDark, setIsDark] = useState(false)
   useEffect(() => {
     const root = document.documentElement
     if (isDark) root.classList.add('dark')

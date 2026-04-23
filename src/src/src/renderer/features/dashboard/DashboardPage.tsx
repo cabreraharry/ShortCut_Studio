@@ -24,6 +24,7 @@ import { TimeRangeBar } from './TimeRangeBar'
 import { DedupCard } from './DedupCard'
 import { HoursSavedCard } from './HoursSavedCard'
 import { DashboardHeroBanner } from '@/components/visual/HeroBanner'
+import { DashboardWelcomeHero } from './DashboardWelcomeHero'
 import { ColorfulStat } from '@/components/visual/ColorfulStat'
 import { WelcomeHero } from '@/components/visual/WelcomeHero'
 import { ActivityTicker } from '@/components/visual/ActivityTicker'
@@ -150,6 +151,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      <DashboardWelcomeHero />
       <DashboardHeroBanner />
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>

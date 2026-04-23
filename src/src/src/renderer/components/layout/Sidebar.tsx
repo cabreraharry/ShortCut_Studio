@@ -10,7 +10,8 @@ import {
   Bot,
   Globe,
   ShieldCheck,
-  Settings
+  Settings,
+  Info
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -97,6 +98,17 @@ const SECTIONS: Array<{ label: string; items: NavItem[] }> = [
         label: 'Settings',
         icon: Settings,
         tip: 'Paths, admin values, and worker diagnostics'
+      }
+    ]
+  },
+  {
+    label: 'Help',
+    items: [
+      {
+        to: '/about',
+        label: 'About',
+        icon: Info,
+        tip: 'What ShortCut Studio is, how it works, and who it’s for'
       }
     ]
   }

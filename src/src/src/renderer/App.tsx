@@ -12,6 +12,7 @@ import LlmPage from './features/llm/LlmPage'
 import CommunityPage from './features/community/CommunityPage'
 import PrivacyPage from './features/privacy/PrivacyPage'
 import SettingsPage from './features/settings/SettingsPage'
+import AboutPage from './features/about/AboutPage'
 
 export default function App() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
           <Route path="/community" element={<CommunityPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/about" element={<AboutPage />} />
         </Routes>
         <Toaster />
       </AppShell>

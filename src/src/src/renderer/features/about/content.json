@@ -1,0 +1,95 @@
+{
+  "_readme": "Copy source for the About page + dialog. Edit freely — the renderer picks up changes on next HMR / rebuild. Sections marked `_status: \"draft\"` still need owner review. When a section is finalized, change status to `final`.",
+  "version": 1,
+  "tagline": {
+    "_status": "draft",
+    "text": "Local-first eBook intelligence for researchers and academics."
+  },
+  "ourSolution": {
+    "_status": "draft",
+    "paragraphs": [
+      "ShortCut Studio turns a messy drawer of PDFs, EPUBs, and papers into a navigable library organised by topic and super-category. It scans your drives, runs classification using the LLM you choose (local or remote), and keeps the results orderly — without uploading anything to the cloud unless you explicitly say so.",
+      "It's built for researchers who accumulate thousands of documents and want to see across them by concept, not by filename."
+    ]
+  },
+  "mission": {
+    "_status": "draft",
+    "heading": "Make deep libraries navigable.",
+    "body": "Research papers, technical books, and long-form content should be searchable the way your brain thinks — by idea, not by filename. ShortCut Studio brings that shape to a folder of PDFs."
+  },
+  "vision": {
+    "_status": "draft",
+    "heading": "A peer-powered research OS.",
+    "body": "A future where every document is classified once across a trusted peer network, so nobody pays the extraction cost twice. Private work stays yours; shared-by-default public work benefits everyone."
+  },
+  "howItWorks": {
+    "_status": "draft",
+    "steps": [
+      {
+        "to": "/folders",
+        "title": "Pick folders to scan",
+        "detail": "Tell ShortCut where your eBooks and research papers live."
+      },
+      {
+        "to": "/llm",
+        "title": "Configure an LLM",
+        "detail": "Use Ollama for fully-local inference, or add an OpenAI / Claude / Gemini key."
+      },
+      {
+        "to": "/topics",
+        "title": "Review topics as they generate",
+        "detail": "Approve, rename, or group AI-suggested topics into super-categories."
+      },
+      {
+        "to": "/dashboard",
+        "title": "Monitor progress",
+        "detail": "The Progress Glass shows lifetime progress plus the delta from your chosen time range."
+      },
+      {
+        "to": "/privacy",
+        "title": "Keep sensitive work private",
+        "detail": "Add private terms so matching files route to the Private library and never leave your machine."
+      }
+    ]
+  },
+  "privacy": {
+    "_status": "draft",
+    "headline": "Privacy-first by default.",
+    "body": "Commercial LLM providers may learn from what you feed them. ShortCut Studio defaults to local-first inference via Ollama, and never uploads a file's contents without your explicit choice of provider.",
+    "facts": [
+      "Stays on this machine — your eBooks, PDFs, and the SQLite databases never leave your drives.",
+      "Only sent to an LLM when you trigger classification — and only to the provider you picked.",
+      "The peer network (when enabled) shares document hashes for deduplication, never file contents."
+    ]
+  },
+  "community": {
+    "_status": "draft",
+    "paragraphs": [
+      "When you dedicate disk and CPU to the peer network, each paper in your library gets classified once — globally. If a peer already processed a document, you get the result instantly; if not, your machine might be the one that helps someone else.",
+      "This is opt-in. The peer network UI works in this build, but the backend that coordinates it (ExecEngine) is still in development — so for now your local processing is all there is."
+    ],
+    "statusNote": "Peer network UI is live; the coordinating backend is in development. Expect real peer data in a future release."
+  },
+  "credits": {
+    "_status": "draft",
+    "paragraphs": [
+      "Built by a small team with researchers as the primary audience. The backend infrastructure is maintained by the ExecEngine project; worker binaries come from SCL_Demo; this desktop client is ShortCut Studio."
+    ],
+    "stack": [
+      "Electron",
+      "React",
+      "Vite",
+      "TypeScript",
+      "Tailwind CSS",
+      "shadcn/ui",
+      "SQLite (better-sqlite3)",
+      "Python (PyInstaller workers)",
+      "FastAPI"
+    ],
+    "acknowledgment": "Built on the shoulders of many open-source projects — thank you to the Electron, React, Vite, Tailwind, shadcn/ui, Radix UI, and SQLite communities."
+  },
+  "feedback": {
+    "_status": "draft",
+    "note": "Feedback, bug reports, and feature requests — contact channel TBD."
+  }
+}
