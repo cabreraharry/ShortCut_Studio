@@ -44,3 +44,4 @@ Thumbs.db
 # Local Claude state (project-scoped .claude/ IS committed; per-user state is not)
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+.claude/plans/

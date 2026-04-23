@@ -7,17 +7,17 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "dev": "electron-vite dev",
-    "build": "electron-vite build",
-    "preview": "electron-vite preview",
-    "build:unpack": "electron-vite build && electron-builder --dir",
-    "build:win": "electron-vite build && electron-builder --win",
+    "dev": "node scripts/run-clean.mjs electron-vite dev",
+    "build": "node scripts/run-clean.mjs electron-vite build",
+    "preview": "node scripts/run-clean.mjs electron-vite preview",
+    "build:unpack": "node scripts/run-clean.mjs electron-vite build && electron-builder --dir",
+    "build:win": "node scripts/run-clean.mjs electron-vite build && electron-builder --win",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "test": "vitest",
     "test:e2e": "playwright test",
-    "storybook": "tsx scripts/storybook.ts",
+    "storybook": "node scripts/run-clean.mjs tsx scripts/storybook.ts",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
