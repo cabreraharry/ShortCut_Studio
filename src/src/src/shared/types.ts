@@ -341,3 +341,58 @@ export interface WorkerStatus {
   exitCode?: number
   restartCount: number
 }
+
+// ---------- Dev mode ----------
+
+export interface DevPaths {
+  appVersion: string
+  electronVersion: string
+  nodeVersion: string
+  chromeVersion: string
+  platform: string
+  userData: string
+  resources: string
+  locAdmDb: string
+  workersDir: string | null
+  projectRoot: string
+  isPackaged: boolean
+}
+
+export interface DevSqlResult {
+  ok: boolean
+  error?: string
+  columns: string[]
+  rows: unknown[][]
+  truncated: boolean
+  rowCount: number
+  durationMs: number
+}
+
+export interface DevStorybookInfo {
+  mtime: number | null
+  screenshotCount: number
+  unpackedExists: boolean
+  unpackedPath: string
+  storybookDir: string
+}
+
+export type DevStorybookStream = 'stdout' | 'stderr' | 'system'
+
+export interface DevStorybookLog {
+  stream: DevStorybookStream
+  line: string
+  ts: number
+}
+
+export interface DevRunStorybookResult {
+  ok: boolean
+  exitCode: number | null
+  error?: string
+}
+
+export interface DevStorybookScreenshot {
+  name: string
+  route: string
+  dataUrl: string
+  sizeBytes: number
+}

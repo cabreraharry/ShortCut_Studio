@@ -6,8 +6,27 @@ import { registerIpcHandlers } from './ipc'
 import { initDatabase, closeDatabase } from './db/connection'
 import { runMigrations } from './db/migrations'
 import { startWorkerSupervisor, stopAllWorkers } from './workers/supervisor'
+import { IpcChannel } from '@shared/ipc-channels'
 
 let mainWindow: BrowserWindow | null = null
+
+function attachDevModeShortcut(win: BrowserWindow): void {
+  // Ctrl+Shift+D toggles the hidden Dev Mode overlay. Uses before-input-event
+  // (window-scoped) rather than globalShortcut so other apps aren't blocked.
+  win.webContents.on('before-input-event', (event, input) => {
+    if (
+      input.type === 'keyDown' &&
+      input.key.toLowerCase() === 'd' &&
+      input.control &&
+      input.shift &&
+      !input.alt &&
+      !input.meta
+    ) {
+      event.preventDefault()
+      win.webContents.send(IpcChannel.DevToggle)
+    }
+  })
+}
 
 async function bootstrap(): Promise<void> {
   await app.whenReady()
@@ -17,11 +36,13 @@ async function bootstrap(): Promise<void> {
   startWorkerSupervisor()
 
   mainWindow = createMainWindow()
+  attachDevModeShortcut(mainWindow)
   createTray(mainWindow)
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       mainWindow = createMainWindow()
+      if (mainWindow) attachDevModeShortcut(mainWindow)
     }
   })
 }

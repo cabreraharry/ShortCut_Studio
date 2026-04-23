@@ -93,7 +93,21 @@ export const IpcChannel = {
   FiltersClipboardApply: 'filters:clipboard-apply',
 
   // Knowledge Map
-  KnowledgeMapGraph: 'knowledge-map:graph'
+  KnowledgeMapGraph: 'knowledge-map:graph',
+
+  // Dev mode (Ctrl+Shift+D overlay)
+  DevToggle: 'dev:toggle',
+  DevOpenDevTools: 'dev:open-devtools',
+  DevCloseDevTools: 'dev:close-devtools',
+  DevReload: 'dev:reload',
+  DevHardReset: 'dev:hard-reset',
+  DevGetPaths: 'dev:get-paths',
+  DevSqlSelect: 'dev:sql-select',
+  DevGetStorybookInfo: 'dev:get-storybook-info',
+  DevRunStorybook: 'dev:run-storybook',
+  DevOpenStorybookFolder: 'dev:open-storybook-folder',
+  DevStorybookLog: 'dev:storybook-log',
+  DevListStorybookScreenshots: 'dev:list-storybook-screenshots'
 } as const
 
 export type IpcChannelName = (typeof IpcChannel)[keyof typeof IpcChannel]

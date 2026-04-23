@@ -7,7 +7,9 @@ import {
   RotateCw,
   CheckCircle2,
   AlertCircle,
-  HardDrive
+  HardDrive,
+  Keyboard,
+  Wrench
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -40,7 +42,37 @@ export default function SettingsPage() {
       <PathsCard />
       <AdminCard />
       {SHOW_DIAGNOSTICS && <DiagnosticsCard />}
+      <DeveloperTip />
     </div>
+  )
+}
+
+function DeveloperTip() {
+  return (
+    <Card className="border-dashed bg-muted/20">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-sm">
+          <Wrench className="h-4 w-4" />
+          Developer tools
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5 rounded-md bg-background px-2 py-1 font-mono text-[11px] text-foreground shadow-sm">
+            <Keyboard className="h-3 w-3" />
+            Ctrl
+            <span className="text-muted-foreground">+</span>
+            Shift
+            <span className="text-muted-foreground">+</span>D
+          </span>
+          <span>
+            opens the developer overlay — SQL console, worker controls, live IPC
+            inspector, and the storybook runner. Hidden by default so end users
+            don’t see it.
+          </span>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

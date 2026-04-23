@@ -130,6 +130,33 @@ const api: ElectronAPI = {
   },
   knowledgeMap: {
     graph: (params) => ipcRenderer.invoke(IpcChannel.KnowledgeMapGraph, params)
+  },
+  dev: {
+    openDevTools: () => ipcRenderer.invoke(IpcChannel.DevOpenDevTools),
+    closeDevTools: () => ipcRenderer.invoke(IpcChannel.DevCloseDevTools),
+    reload: () => ipcRenderer.invoke(IpcChannel.DevReload),
+    hardReset: () => ipcRenderer.invoke(IpcChannel.DevHardReset),
+    getPaths: () => ipcRenderer.invoke(IpcChannel.DevGetPaths),
+    sqlSelect: (sql) => ipcRenderer.invoke(IpcChannel.DevSqlSelect, sql),
+    getStorybookInfo: () => ipcRenderer.invoke(IpcChannel.DevGetStorybookInfo),
+    listStorybookScreenshots: () =>
+      ipcRenderer.invoke(IpcChannel.DevListStorybookScreenshots),
+    runStorybook: () => ipcRenderer.invoke(IpcChannel.DevRunStorybook),
+    openStorybookFolder: () =>
+      ipcRenderer.invoke(IpcChannel.DevOpenStorybookFolder),
+    onStorybookLog: (cb) => {
+      const listener = (
+        _: unknown,
+        p: import('@shared/types').DevStorybookLog
+      ): void => cb(p)
+      ipcRenderer.on(IpcChannel.DevStorybookLog, listener)
+      return () => ipcRenderer.removeListener(IpcChannel.DevStorybookLog, listener)
+    },
+    onToggle: (cb) => {
+      const listener = (): void => cb()
+      ipcRenderer.on(IpcChannel.DevToggle, listener)
+      return () => ipcRenderer.removeListener(IpcChannel.DevToggle, listener)
+    }
   }
 }
 

@@ -7,6 +7,11 @@ import type {
   DataSourceState,
   DbMode,
   DedupSummary,
+  DevPaths,
+  DevRunStorybookResult,
+  DevSqlResult,
+  DevStorybookInfo,
+  DevStorybookScreenshot,
   DriveInfo,
   FileTypeFilter,
   FilterPreset,
@@ -145,6 +150,22 @@ export interface ElectronAPI {
   }
   knowledgeMap: {
     graph: (params?: KnowledgeMapParams) => Promise<KnowledgeMapGraph>
+  }
+  dev: {
+    openDevTools: () => Promise<void>
+    closeDevTools: () => Promise<void>
+    reload: () => Promise<void>
+    hardReset: () => Promise<void>
+    getPaths: () => Promise<DevPaths>
+    sqlSelect: (sql: string) => Promise<DevSqlResult>
+    getStorybookInfo: () => Promise<DevStorybookInfo>
+    listStorybookScreenshots: () => Promise<DevStorybookScreenshot[]>
+    runStorybook: () => Promise<DevRunStorybookResult>
+    openStorybookFolder: () => Promise<void>
+    onStorybookLog: (
+      cb: (p: import('./types').DevStorybookLog) => void
+    ) => () => void
+    onToggle: (cb: () => void) => () => void
   }
 }
 

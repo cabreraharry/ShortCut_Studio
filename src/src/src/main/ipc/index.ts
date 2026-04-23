@@ -16,6 +16,7 @@ import { registerInsightsHandlers } from './insights'
 import { registerDriveHandlers } from './drives'
 import { registerFilterHandlers } from './filters'
 import { registerKnowledgeMapHandlers } from './knowledgeMap'
+import { registerDevHandlers } from './dev'
 
 export function registerIpcHandlers(): void {
   registerAppHandlers()
@@ -36,4 +37,5 @@ export function registerIpcHandlers(): void {
   registerDriveHandlers()
   registerFilterHandlers()
   registerKnowledgeMapHandlers()
+  registerDevHandlers()
 }
