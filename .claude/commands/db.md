@@ -16,7 +16,7 @@ If `$ARGUMENTS` is empty, dump:
 Use this template (replace `<SQL>` and quote-escape carefully):
 
 ```bash
-cd "d:/Client-Side_Project/ElectronAdmin2/src/src" && node -e "
+cd "d:/Client-Side_Project/ShortCut_Studio/src/src" && node -e "
 const Database = require('better-sqlite3');
 const db = new Database('db_files/loc_adm.db', { readonly: true });
 console.log(JSON.stringify(db.prepare(\`<SQL>\`).all(), null, 2));

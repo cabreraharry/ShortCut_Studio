@@ -20,7 +20,7 @@ Minimum reading order: `docs/claude-handoff/README.md` → `01-conversation-log.
 - Maintain a list of private terms that route matching files to the Private DB
 - Diagnose background workers when something breaks
 
-Stack: Electron + Vite + React 18 + TypeScript + Tailwind + shadcn/ui. The Bootstrap+jQuery predecessor was deleted in the 2026-04-23 cleanup. The repo is hosted at https://github.com/cabreraharry/ShortCut_Studio. Local working folder is still `ElectronAdmin2/` — manual rename pending; the npm package name (`shortcut-studio`), Electron `productName` (`ShortCut Studio`), and Windows installer (`ShortCut Studio-Setup-<ver>.exe`) all already use the new identity.
+Stack: Electron + Vite + React 18 + TypeScript + Tailwind + shadcn/ui. The Bootstrap+jQuery predecessor (`ElectronAdmin2`) was deleted in the 2026-04-23 cleanup. The repo is hosted at https://github.com/cabreraharry/ShortCut_Studio and cloned locally as `ShortCut_Studio/`. The npm package name is `shortcut-studio`, the Electron `productName` is `ShortCut Studio`, and the Windows installer ships as `ShortCut Studio-Setup-<ver>.exe`.
 
 **Approved plan:** `C:/Users/harrycabrera/.claude/plans/okay-here-are-the-dapper-clarke.md`.
 
@@ -29,7 +29,7 @@ Stack: Electron + Vite + React 18 + TypeScript + Tailwind + shadcn/ui. The Boots
 All active work happens in `src/src/` (legacy nested folder — kept so existing Claude Code skills + VS Code tasks keep working without reconfiguration).
 
 ```
-ElectronAdmin2/
+ShortCut_Studio/
 ├── src/
 │   └── src/                        <-- ACTIVE codebase
 │       ├── package.json            electron-vite + deps

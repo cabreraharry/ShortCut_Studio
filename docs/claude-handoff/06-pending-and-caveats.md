@@ -108,7 +108,7 @@ Chips toggle global file-type acceptance. If a user wants to scan PDFs in `/Pape
 
 ### The `src/src/` nesting is intentional
 
-You'll notice the oddly-nested `ElectronAdmin2/src/src/` layout. That predates this rewrite — the old app had it, `.claude/skills` point at it, and fixing the nesting would mean re-pointing all those paths. Not worth the churn. Live with it; it's just a directory.
+You'll notice the oddly-nested `ShortCut_Studio/src/src/` layout. That predates this rewrite — the pre-rewrite ElectronAdmin2 codebase had it, `.claude/skills` point at it, and fixing the nesting would mean re-pointing all those paths. Not worth the churn. Live with it; it's just a directory.
 
 ## Security TODOs
 

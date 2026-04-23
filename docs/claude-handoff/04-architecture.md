@@ -13,7 +13,7 @@ Deep technical tour of the codebase. Written so a new contributor can open the r
 ## Repository layout (as built, absolute paths)
 
 ```
-D:/Client-Side_Project/ElectronAdmin2/
+D:/Client-Side_Project/ShortCut_Studio/
 ├── .vscode/                              ← launch.json, tasks.json, settings.json, extensions.json
 ├── .claude/                              ← project-scoped Claude Code skills (db-backup, rebuild-native, …)
 ├── _Docu/                                ← design PDFs + screenshots from the owner

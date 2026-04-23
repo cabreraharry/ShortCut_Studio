@@ -2,7 +2,7 @@
 
 Unified client-side UI for the SCL document-processing ecosystem. Windows-first Electron desktop app for researchers / academics: scan eBook libraries, configure LLM providers, manage topics + super-categories, monitor progress against the peer network, and route private content to a separate DB.
 
-> **Heads up.** The on-disk folder is still `ElectronAdmin2/` for legacy reasons — it'll be renamed to `ShortCut_Studio/` in a future cleanup. The product itself ships as **ShortCut Studio**.
+> Repo on disk: `ShortCut_Studio/`. Product display name: **ShortCut Studio**. (The pre-rewrite codebase was named `ElectronAdmin2`; some historical handoff docs under [`docs/claude-handoff/`](docs/claude-handoff/) still mention it in past tense.)
 
 ## Where the code lives
 

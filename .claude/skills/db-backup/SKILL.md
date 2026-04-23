@@ -10,7 +10,7 @@ Cheap insurance against losing the only source of truth in this project. Run bef
 ## Backup
 
 ```bash
-cd "d:/Client-Side_Project/ElectronAdmin2/src/src/db_files" && cp loc_adm.db "loc_adm.backup.$(date +%Y%m%d-%H%M%S).db"
+cd "d:/Client-Side_Project/ShortCut_Studio/src/src/db_files" && cp loc_adm.db "loc_adm.backup.$(date +%Y%m%d-%H%M%S).db"
 ```
 
 Then `ls -la loc_adm.backup.*.db` to confirm the file landed and report its size + timestamp back to the user.
@@ -33,7 +33,7 @@ Then `ls -la loc_adm.backup.*.db` to confirm the file landed and report its size
 If a change goes wrong, restore the most recent backup:
 
 ```bash
-cd "d:/Client-Side_Project/ElectronAdmin2/src/src/db_files" && ls -t loc_adm.backup.*.db | head -1 | xargs -I {} cp {} loc_adm.db
+cd "d:/Client-Side_Project/ShortCut_Studio/src/src/db_files" && ls -t loc_adm.backup.*.db | head -1 | xargs -I {} cp {} loc_adm.db
 ```
 
 **Confirm with the user before restoring** — this overwrites current state.

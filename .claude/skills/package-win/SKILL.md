@@ -13,13 +13,13 @@ Wraps `npm run build:win`, which is `electron-vite build && electron-builder --w
 - Ensure `node_modules` is installed in `src/src/`. `electron-builder install-app-deps` runs automatically via the `postinstall` script and rebuilds `better-sqlite3` for the packaged Electron version.
 - Confirm `src/src/resources/icon.ico` exists and has a **256×256** variant — electron-builder rejects smaller ones. If unsure, check:
   ```bash
-  python -c "from PIL import Image; img=Image.open(r'D:/Client-Side_Project/ElectronAdmin2/src/src/resources/icon.ico'); print([e.dim for e in img.ico.entry])"
+  python -c "from PIL import Image; img=Image.open(r'D:/Client-Side_Project/ShortCut_Studio/src/src/resources/icon.ico'); print([e.dim for e in img.ico.entry])"
   ```
 
 ## Run
 
 ```bash
-cd "d:/Client-Side_Project/ElectronAdmin2/src/src" && npm run build:win
+cd "d:/Client-Side_Project/ShortCut_Studio/src/src" && npm run build:win
 ```
 
 Use `run_in_background: true` — the first run downloads Electron prebuilts (~115 MB) and takes 2–5 minutes.

@@ -50,7 +50,7 @@ Users currently must run multiple programs to do one workflow. The UI looks date
 
 ## App Architecture
 
-**In-place rewrite of `D:/Client-Side_Project/ElectronAdmin2/`.** The current `src/src/*` contents (Bootstrap + jQuery renderer, vanilla-JS main) get deleted except for `icon.ico` and `db_files/`. The new React + Vite + TypeScript structure lays down on top. The folder will be renamed to a final product name once one is chosen.
+**In-place rewrite of `D:/Client-Side_Project/ShortCut_Studio/`.** The current `src/src/*` contents (Bootstrap + jQuery renderer, vanilla-JS main) get deleted except for `icon.ico` and `db_files/`. The new React + Vite + TypeScript structure lays down on top. The folder will be renamed to a final product name once one is chosen.
 
 (The final on-disk layout is documented in detail in `04-architecture.md` — the plan's tree diagram matches reality with one minor rename: the `shell/` feature folder became `layout/` under `components/` since the shell is shared chrome, not a per-route feature.)
 

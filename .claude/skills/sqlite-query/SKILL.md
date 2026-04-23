@@ -20,7 +20,7 @@ The SQL contains `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `CREATE`, `REPLA
 ## How to run
 
 ```bash
-cd "d:/Client-Side_Project/ElectronAdmin2/src/src" && node -e "
+cd "d:/Client-Side_Project/ShortCut_Studio/src/src" && node -e "
 const db = require('better-sqlite3')('db_files/loc_adm.db', { readonly: true });
 try {
   console.log(JSON.stringify(db.prepare(process.argv[1]).all(), null, 2));

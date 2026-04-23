@@ -16,7 +16,7 @@ description: Rebuild the native better-sqlite3 binding for the project's bundled
 ## How to run
 
 ```bash
-cd "d:/Client-Side_Project/ElectronAdmin2/src/src" && npx electron-rebuild -f -w better-sqlite3
+cd "d:/Client-Side_Project/ShortCut_Studio/src/src" && npx electron-rebuild -f -w better-sqlite3
 ```
 
 `-f` forces rebuild even if the binding exists; `-w better-sqlite3` scopes to that single module (faster than rebuilding every native dep).
@@ -24,7 +24,7 @@ cd "d:/Client-Side_Project/ElectronAdmin2/src/src" && npx electron-rebuild -f -w
 Alternative (equivalent, slightly slower — rebuilds all native deps):
 
 ```bash
-cd "d:/Client-Side_Project/ElectronAdmin2/src/src" && npx electron-builder install-app-deps
+cd "d:/Client-Side_Project/ShortCut_Studio/src/src" && npx electron-builder install-app-deps
 ```
 
 Takes 30–90 seconds.
@@ -32,7 +32,7 @@ Takes 30–90 seconds.
 ## Verify
 
 ```bash
-ls "d:/Client-Side_Project/ElectronAdmin2/src/src/node_modules/better-sqlite3/build/Release/better_sqlite3.node"
+ls "d:/Client-Side_Project/ShortCut_Studio/src/src/node_modules/better-sqlite3/build/Release/better_sqlite3.node"
 ```
 
 The file should exist with a recent mtime. Launch the app (`npm run dev`) and confirm no native-module error appears in the terminal.

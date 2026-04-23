@@ -7,14 +7,14 @@ Operational guide for picking up where this session left off. Commands, workflow
 ### First-time setup (on a new machine)
 
 ```bash
-cd "D:/Client-Side_Project/ElectronAdmin2/src/src"
+cd "D:/Client-Side_Project/ShortCut_Studio/src/src"
 npm install                           # ~1 min — includes auto electron-rebuild for better-sqlite3
 ```
 
 ### Daily loop
 
 ```bash
-cd "D:/Client-Side_Project/ElectronAdmin2/src/src"
+cd "D:/Client-Side_Project/ShortCut_Studio/src/src"
 npm run dev                            # Vite HMR + Electron hot-reload; Ctrl+C to stop
 ```
 
@@ -51,7 +51,7 @@ Or use the `rebuild-native` project skill.
 
 ### Opening the folder
 
-Open `D:/Client-Side_Project/ElectronAdmin2/` as the workspace root. The Explorer should show the top-level files (CLAUDE.md, README.md, .claude/, src/, docs/, etc.). Your actual work happens under `src/src/`.
+Open `D:/Client-Side_Project/ShortCut_Studio/` as the workspace root. The Explorer should show the top-level files (CLAUDE.md, README.md, .claude/, src/, docs/, etc.). Your actual work happens under `src/src/`.
 
 If VS Code Explorer shows stale pre-rewrite files (index.html, renderer.js, etc.), `Ctrl+Shift+P → File: Refresh Explorer`. Those files are gone — git is clean.
 

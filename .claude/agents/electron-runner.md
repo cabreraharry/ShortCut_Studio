@@ -17,7 +17,7 @@ You are the dev-loop runner. Job: start the app, surface logs, and stop it. Do N
 
 ## Run
 ```bash
-cd "d:/Client-Side_Project/ElectronAdmin2/src/src" && npm start
+cd "d:/Client-Side_Project/ShortCut_Studio/src/src" && npm start
 ```
 Run with `run_in_background: true`. The Electron window opens — there's no headless mode. Tail the background output for `Connected to the SQLite database`, `index.html File loaded successfully`, and any `Error` lines.
 

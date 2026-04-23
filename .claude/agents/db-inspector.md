@@ -24,7 +24,7 @@ Models(ModelID, ProviderID, ModelName, ProviderDefault)
 There is no `sqlite3` CLI on PATH. Use the already-installed `sqlite3` npm module via `node -e`. Always run from `src/src/`:
 
 ```bash
-cd "d:/Client-Side_Project/ElectronAdmin2/src/src" && node -e "
+cd "d:/Client-Side_Project/ShortCut_Studio/src/src" && node -e "
 const db = require('sqlite3').verbose().Database;
 const d = new db('db_files/loc_adm.db');
 d.all('SELECT * FROM LLM_Provider', (e, r) => { console.log(JSON.stringify(r, null, 2)); d.close(); });
