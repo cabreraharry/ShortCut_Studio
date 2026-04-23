@@ -26,7 +26,6 @@ import { HoursSavedCard } from './HoursSavedCard'
 import { DashboardHeroBanner } from '@/components/visual/HeroBanner'
 import { DashboardWelcomeHero } from './DashboardWelcomeHero'
 import { ColorfulStat } from '@/components/visual/ColorfulStat'
-import { WelcomeHero } from '@/components/visual/WelcomeHero'
 import { ActivityTicker } from '@/components/visual/ActivityTicker'
 import { useBurst } from '@/components/visual/Burst'
 import { cn } from '@/lib/utils'
@@ -95,11 +94,6 @@ export default function DashboardPage() {
     queryFn: () => api.progress.jobs(),
     refetchInterval: 3000
   })
-  const { data: folders = [] } = useQuery({
-    queryKey: ['folders'],
-    queryFn: () => api.folders.list()
-  })
-
   // Four processing-artifact tabs from the "Type of Progress" whiteboard.
   // Each tab scales the raw processed count by a tab-specific coefficient
   // since we have no real per-artifact counts yet.
@@ -144,10 +138,6 @@ export default function DashboardPage() {
       }
     }
   }, [summary, allTimeTotalPct, fireMilestone])
-
-  if (folders.length === 0) {
-    return <WelcomeHero />
-  }
 
   return (
     <div className="space-y-6">
