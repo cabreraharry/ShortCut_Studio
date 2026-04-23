@@ -57,7 +57,7 @@ export const PROVIDER_GUIDES: Record<string, ProviderGuide> = {
       },
       {
         title: 'Create an API key',
-        body: 'In Settings → API Keys, click "Create Key". Name it "SCL Admin" so you can identify it later. Copy once.',
+        body: 'In Settings → API Keys, click "Create Key". Name it "ShortCut Studio" so you can identify it later. Copy once.',
         link: { label: 'API keys', url: 'https://console.anthropic.com/settings/keys' }
       },
       {

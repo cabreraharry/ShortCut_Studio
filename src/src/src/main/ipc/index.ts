@@ -1,5 +1,6 @@
 import { registerAppHandlers } from './app'
 import { registerModeHandlers } from './mode'
+import { registerDataSourceHandlers } from './dataSource'
 import { registerFolderHandlers } from './folders'
 import { registerFileTypeHandlers } from './fileTypes'
 import { registerLlmHandlers } from './llm'
@@ -10,10 +11,16 @@ import { registerSuperCategoryHandlers } from './superCategories'
 import { registerIpfsHandlers } from './ipfs'
 import { registerPrivacyHandlers } from './privacy'
 import { registerDiagnosticsHandlers } from './diagnostics'
+import { registerSystemHandlers } from './system'
+import { registerInsightsHandlers } from './insights'
+import { registerDriveHandlers } from './drives'
+import { registerFilterHandlers } from './filters'
+import { registerKnowledgeMapHandlers } from './knowledgeMap'
 
 export function registerIpcHandlers(): void {
   registerAppHandlers()
   registerModeHandlers()
+  registerDataSourceHandlers()
   registerFolderHandlers()
   registerFileTypeHandlers()
   registerLlmHandlers()
@@ -24,4 +31,9 @@ export function registerIpcHandlers(): void {
   registerIpfsHandlers()
   registerPrivacyHandlers()
   registerDiagnosticsHandlers()
+  registerSystemHandlers()
+  registerInsightsHandlers()
+  registerDriveHandlers()
+  registerFilterHandlers()
+  registerKnowledgeMapHandlers()
 }

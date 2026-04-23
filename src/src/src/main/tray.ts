@@ -7,16 +7,23 @@ export function createTray(win: BrowserWindow): Tray {
   const iconPath = join(__dirname, '../../resources/icon.ico')
   const image = nativeImage.createFromPath(iconPath)
   tray = new Tray(image)
-  tray.setToolTip('SCL Admin')
+  tray.setToolTip('ShortCut Studio')
 
   const menu = Menu.buildFromTemplate([
-    { label: 'Show App', click: () => win.show() },
+    {
+      label: 'Show App',
+      click: () => {
+        if (win.isDestroyed()) return
+        win.show()
+      }
+    },
     { type: 'separator' },
     { label: 'Quit', click: () => { app.quit() } }
   ])
 
   tray.setContextMenu(menu)
   tray.on('click', () => {
+    if (win.isDestroyed()) return
     if (win.isVisible()) win.hide()
     else win.show()
   })

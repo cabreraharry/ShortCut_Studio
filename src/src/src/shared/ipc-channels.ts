@@ -8,6 +8,10 @@ export const IpcChannel = {
   ModeGet: 'mode:get',
   ModeSet: 'mode:set',
 
+  // Data source (Demo vs Prod)
+  DataSourceGet: 'dataSource:get',
+  DataSourceSet: 'dataSource:set',
+
   // Folders (content detection)
   FoldersList: 'folders:list',
   FoldersAdd: 'folders:add',
@@ -39,8 +43,13 @@ export const IpcChannel = {
   // Topics
   TopicsList: 'topics:list',
   TopicsGenerate: 'topics:generate',
+  TopicsAutoOrganize: 'topics:auto-organize',
   TopicsReview: 'topics:review',
   TopicsApprove: 'topics:approve',
+  TopicsDistribution: 'topics:distribution',
+  TopicsReject: 'topics:reject',
+  TopicsRename: 'topics:rename',
+  TopicsMerge: 'topics:merge',
   SuperCategoriesList: 'super-categories:list',
   SuperCategoriesCreate: 'super-categories:create',
   SuperCategoriesRename: 'super-categories:rename',
@@ -59,7 +68,32 @@ export const IpcChannel = {
   // Diagnostics
   DiagnosticsWorkers: 'diagnostics:workers',
   DiagnosticsRestartWorker: 'diagnostics:restart-worker',
-  DiagnosticsTailLog: 'diagnostics:tail-log'
+  DiagnosticsTailLog: 'diagnostics:tail-log',
+
+  // System (OS shortcuts + filesystem helpers)
+  SystemOpenFile: 'system:open-file',
+  SystemRevealFolder: 'system:reveal-folder',
+  SystemListDrives: 'system:list-drives',
+  SystemListChildren: 'system:list-children',
+
+  // Insights (dedup + folder health + document extraction)
+  ProgressDedupSummary: 'progress:dedup-summary',
+  FoldersHealth: 'folders:health',
+  InsightsList: 'insights:list',
+  InsightsGroups: 'insights:groups',
+
+  // Filter Workbench
+  FiltersPreview: 'filters:preview',
+  FiltersListPresets: 'filters:list-presets',
+  FiltersSavePreset: 'filters:save-preset',
+  FiltersDeletePreset: 'filters:delete-preset',
+  FiltersClassify: 'filters:classify',
+  FiltersClassifyProgress: 'filters:classify-progress',
+  FiltersClipboardPrompt: 'filters:clipboard-prompt',
+  FiltersClipboardApply: 'filters:clipboard-apply',
+
+  // Knowledge Map
+  KnowledgeMapGraph: 'knowledge-map:graph'
 } as const
 
 export type IpcChannelName = (typeof IpcChannel)[keyof typeof IpcChannel]

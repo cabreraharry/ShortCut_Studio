@@ -1,6 +1,12 @@
 import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'node:path'
 
+let isQuitting = false
+
+export function markQuitting(): void {
+  isQuitting = true
+}
+
 export function createMainWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
@@ -20,6 +26,16 @@ export function createMainWindow(): BrowserWindow {
   })
 
   win.once('ready-to-show', () => win.show())
+
+  // Tray-resident: clicking the X hides instead of destroying so the tray icon
+  // still has a live window to toggle. Real teardown happens once before-quit
+  // flips isQuitting.
+  win.on('close', (e) => {
+    if (!isQuitting) {
+      e.preventDefault()
+      win.hide()
+    }
+  })
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)

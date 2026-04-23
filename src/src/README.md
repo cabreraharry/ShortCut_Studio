@@ -1,6 +1,6 @@
-# SCL_Admin
+# ShortCut Studio
 
-This is the SCL_Admin project.
+Unified client-side UI for SCL document processing. Windows-first Electron desktop app.
 
 ## Getting Started in Webstorm
 

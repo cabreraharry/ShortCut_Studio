@@ -1,7 +1,7 @@
 import { app, BrowserWindow } from 'electron'
 import { join } from 'node:path'
-import { createMainWindow } from './window'
-import { createTray } from './tray'
+import { createMainWindow, markQuitting } from './window'
+import { createTray, destroyTray } from './tray'
 import { registerIpcHandlers } from './ipc'
 import { initDatabase, closeDatabase } from './db/connection'
 import { runMigrations } from './db/migrations'
@@ -32,6 +32,8 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
+  markQuitting()
+  destroyTray()
   stopAllWorkers()
   closeDatabase()
 })

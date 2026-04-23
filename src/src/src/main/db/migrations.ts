@@ -94,6 +94,23 @@ export function runMigrations(): void {
       topicName TEXT PRIMARY KEY,
       superCategoryId INTEGER NOT NULL REFERENCES SuperCategories(SuperCategoryID) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS FilterPresets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      ruleJson TEXT NOT NULL,
+      createdAt INTEGER NOT NULL,
+      lastUsed INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS FileAiLabels (
+      fileId INTEGER PRIMARY KEY,
+      label TEXT NOT NULL CHECK (label IN ('publication', 'other', 'unlabeled')),
+      confidence REAL NOT NULL DEFAULT 0,
+      model TEXT NOT NULL,
+      classifiedAt INTEGER NOT NULL,
+      reason TEXT
+    );
   `)
 
   // Seed admin settings row if missing
@@ -135,7 +152,12 @@ export function runMigrations(): void {
     seed.run('.pdf', 'PDF', 1, 1)
     seed.run('.epub', 'EPUB', 1, 2)
     seed.run('.mobi', 'MOBI', 1, 3)
-    seed.run('.azw3', 'AZW3', 0, 4)
-    seed.run('.djvu', 'DJVU', 0, 5)
   }
+
+  // Cleanup: remove unsupported file types that were previously seeded.
+  // .azw3 and .djvu are not yet supported by the scanner — they shouldn't
+  // appear in the UI as confusing disabled chips. If the user ever adds
+  // them back manually (via the "Add extension" input), their choice is
+  // preserved since this only runs once per boot.
+  db.prepare("DELETE FROM FileTypeFilters WHERE extension IN ('.azw3', '.djvu') AND enabled = 0").run()
 }

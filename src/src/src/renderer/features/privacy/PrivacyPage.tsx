@@ -1,11 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { Trash2, Plus, Lock, ShieldCheck } from 'lucide-react'
+import { Trash2, Plus, Lock, ShieldCheck, Globe, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
+import { PrivacyShield } from '@/components/visual/PrivacyShield'
+import type { DbMode } from '@shared/types'
 
 export default function PrivacyPage() {
   const qc = useQueryClient()
@@ -50,6 +53,10 @@ export default function PrivacyPage() {
           Files or folders whose path contains any of these terms are routed to the Private database. Matching uses case-insensitive substring — no regex.
         </p>
       </div>
+
+      <PrivacyShield />
+
+      <LibraryModeCard />
 
       <Card>
         <CardHeader>
@@ -121,5 +128,109 @@ export default function PrivacyPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+function LibraryModeCard() {
+  const qc = useQueryClient()
+  const { data: mode } = useQuery({
+    queryKey: ['mode'],
+    queryFn: () => api.mode.get()
+  })
+  const setMode = useMutation({
+    mutationFn: (next: DbMode) => api.mode.set(next),
+    onSuccess: () => qc.invalidateQueries()
+  })
+  const current: DbMode = mode ?? 'publ'
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Globe className="h-4 w-4" />
+          Library mode
+        </CardTitle>
+        <CardDescription>
+          Your scans and topics live in <b>two separate databases</b>. Switch between them to keep work-related
+          research walled off from personal study, or to share one while keeping the other invisible to peers.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <ModeOption
+            kind="publ"
+            active={current === 'publ'}
+            onClick={() => setMode.mutate('publ')}
+          />
+          <ModeOption
+            kind="priv"
+            active={current === 'priv'}
+            onClick={() => setMode.mutate('priv')}
+          />
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          The mode chip in the top-right header shows which library you&apos;re currently viewing. Click it any
+          time to return here.
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
+function ModeOption({
+  kind,
+  active,
+  onClick
+}: {
+  kind: DbMode
+  active: boolean
+  onClick: () => void
+}): JSX.Element {
+  const isPrivate = kind === 'priv'
+  const Icon = isPrivate ? Lock : Globe
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'group flex flex-col gap-2 rounded-lg border p-4 text-left transition-all',
+        active
+          ? isPrivate
+            ? 'border-rose-500/50 bg-rose-500/10 shadow-sm'
+            : 'border-glass-local/50 bg-glass-local/10 shadow-sm'
+          : 'border-border bg-card/40 hover:border-primary/40 hover:bg-accent/40'
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <div
+          className={cn(
+            'flex h-9 w-9 items-center justify-center rounded-md',
+            isPrivate
+              ? active
+                ? 'bg-rose-500/25 text-rose-800 dark:text-rose-300'
+                : 'bg-muted/50 text-muted-foreground'
+              : active
+                ? 'bg-glass-local/25 text-glass-local'
+                : 'bg-muted/50 text-muted-foreground'
+          )}
+        >
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="flex-1">
+          <div className="text-sm font-semibold">
+            {isPrivate ? 'Private library' : 'Public library'}
+          </div>
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            {active ? 'Currently active' : 'Click to switch'}
+          </div>
+        </div>
+        {active && <ArrowRight className="h-4 w-4 text-muted-foreground" />}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {isPrivate
+          ? 'Scans and topics here are NEVER shared with peers or sent to remote LLMs. Files whose path contains any of your private terms (below) are auto-routed here.'
+          : 'Shared with the peer network so duplicate files only need to be processed once. Use this for public research — papers, textbooks, open-source docs.'}
+      </p>
+    </button>
   )
 }

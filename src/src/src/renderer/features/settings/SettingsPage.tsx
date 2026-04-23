@@ -6,13 +6,25 @@ import {
   HeartPulse,
   RotateCw,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  HardDrive
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
+import { DriveTree } from '@/components/drive-tree/DriveTree'
+import { WorkerConstellation } from '@/components/visual/WorkerConstellation'
 import { api } from '@/lib/api'
+import { toast } from '@/hooks/use-toast'
+import { SHOW_DIAGNOSTICS } from '@/lib/app-info'
 import type { AppSettings, WorkerStatus } from '@shared/types'
 
 export default function SettingsPage() {
@@ -21,17 +33,19 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="text-sm text-muted-foreground">
-          Paths, admin values, and worker diagnostics.
+          Paths, admin values, and worker diagnostics. For an overview of the app, click the{' '}
+          <span className="font-semibold">?</span> icon in the top-right.
         </p>
       </div>
       <PathsCard />
       <AdminCard />
-      <DiagnosticsCard />
+      {SHOW_DIAGNOSTICS && <DiagnosticsCard />}
     </div>
   )
 }
 
 function PathsCard() {
+  const [browseOpen, setBrowseOpen] = useState(false)
   return (
     <Card>
       <CardHeader>
@@ -47,14 +61,39 @@ function PathsCard() {
         <PathRow
           label="Hidden content folder"
           description="Thumbnails, extracted metadata, IPFS-staging content."
-          currentValue="%AppData%\SCL_Admin\content"
+          currentValue="%AppData%\ShortCut Studio\content"
+          onBrowse={() => setBrowseOpen(true)}
         />
         <PathRow
           label="Desktop search folder"
           description="Shortcuts organized by topic. You can use OS search inside."
           currentValue="%UserProfile%\Desktop\_SCL_"
+          onBrowse={() => setBrowseOpen(true)}
         />
       </CardContent>
+
+      <Dialog open={browseOpen} onOpenChange={setBrowseOpen}>
+        <DialogContent className="max-h-[80vh] max-w-2xl overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>Browse drives</DialogTitle>
+            <DialogDescription>
+              Preview-only for now. Click Include or Exclude to see the destination; the actual Move flow lands
+              in a later task.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto rounded-md border border-border">
+            <DriveTree
+              onPick={(path) => {
+                setBrowseOpen(false)
+                toast({
+                  title: 'Path move not yet implemented',
+                  description: `You picked ${path}. The Move flow will land in a later task.`
+                })
+              }}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }
@@ -62,11 +101,13 @@ function PathsCard() {
 function PathRow({
   label,
   description,
-  currentValue
+  currentValue,
+  onBrowse
 }: {
   label: string
   description: string
   currentValue: string
+  onBrowse: () => void
 }) {
   return (
     <div className="rounded-md border border-border p-3">
@@ -75,9 +116,15 @@ function PathRow({
           <div className="text-sm font-medium">{label}</div>
           <div className="text-xs text-muted-foreground">{description}</div>
         </div>
-        <Button variant="outline" size="sm" disabled>
-          Move…
-        </Button>
+        <div className="flex gap-1">
+          <Button variant="outline" size="sm" onClick={onBrowse}>
+            <HardDrive className="mr-1 h-3 w-3" />
+            Browse…
+          </Button>
+          <Button variant="outline" size="sm" disabled>
+            Move…
+          </Button>
+        </div>
       </div>
       <div className="mt-2 rounded bg-muted/30 px-2 py-1 font-mono text-xs text-muted-foreground">
         {currentValue}
@@ -210,7 +257,8 @@ function DiagnosticsCard() {
         </Button>
       </CardHeader>
       {open && (
-        <CardContent>
+        <CardContent className="space-y-4">
+          <WorkerConstellation workers={workers} />
           <div className="divide-y divide-border rounded-md border border-border">
             {workers.map((w) => (
               <WorkerRow

@@ -2,12 +2,10 @@ import { cn } from '@/lib/utils'
 import type { TimeRange } from '@shared/types'
 
 const RANGES: { value: TimeRange; label: string }[] = [
-  { value: '12h', label: '12h' },
-  { value: '24h', label: '24h' },
-  { value: '2d', label: '2d' },
-  { value: '5d', label: '5d' },
-  { value: '10d', label: '10d' },
-  { value: 'all', label: 'All' }
+  { value: '5h', label: '5h' },
+  { value: '1d', label: '1d' },
+  { value: '3d', label: '3d' },
+  { value: '5d', label: '5d' }
 ]
 
 export function TimeRangeBar({

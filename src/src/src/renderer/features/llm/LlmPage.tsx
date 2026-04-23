@@ -10,6 +10,38 @@ import { api } from '@/lib/api'
 import type { LlmProvider, LlmTestResult } from '@shared/types'
 import { OnboardingDialog } from './OnboardingDialog'
 import { PROVIDER_GUIDES, type ProviderGuide } from './provider-onboarding'
+import { ProviderHub } from '@/components/visual/ProviderHub'
+
+const BRAND: Record<
+  string,
+  { solid: string; tint: string; initial: string }
+> = {
+  Ollama: { solid: '#8B5CF6', tint: 'rgba(139, 92, 246, 0.15)', initial: 'O' },
+  OpenAI: { solid: '#10A37F', tint: 'rgba(16, 163, 127, 0.15)', initial: 'O' },
+  Claude: { solid: '#D97757', tint: 'rgba(217, 119, 87, 0.15)', initial: 'C' },
+  Gemini: { solid: '#4285F4', tint: 'rgba(66, 133, 244, 0.15)', initial: 'G' },
+  Default: { solid: '#6366F1', tint: 'rgba(99, 102, 241, 0.12)', initial: '?' }
+}
+
+function BrandBadge({
+  providerName,
+  active
+}: {
+  providerName: string
+  active: boolean
+}): JSX.Element {
+  const brand = BRAND[providerName] ?? BRAND.Default
+  return (
+    <div
+      className="flex h-7 w-7 items-center justify-center rounded-md text-xs font-bold text-white"
+      style={{
+        backgroundColor: active ? brand.solid : 'hsl(var(--muted-foreground) / 0.3)'
+      }}
+    >
+      {brand.initial}
+    </div>
+  )
+}
 
 export default function LlmPage() {
   const [onboardingFor, setOnboardingFor] = useState<ProviderGuide | null>(null)
@@ -23,13 +55,15 @@ export default function LlmPage() {
         </p>
       </div>
 
+      <ProviderHub />
+
       <PrivacyCallout />
 
       <Card>
         <CardHeader>
           <CardTitle>Providers</CardTitle>
           <CardDescription>
-            Enable a provider by adding an API key (or running Ollama locally). The provider set as default is used when a feature doesn't override it.
+            Enable a provider by adding an API key (or running Ollama locally). The provider set as default is used when a feature doesn&apos;t override it.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -48,12 +82,14 @@ export default function LlmPage() {
 
 function PrivacyCallout() {
   return (
-    <Card className="border-amber-500/30 bg-amber-500/5">
+    <Card className="border-amber-500/50 bg-amber-500/10 dark:border-amber-500/30 dark:bg-amber-500/5">
       <CardContent className="flex gap-3 p-4">
-        <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+        <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-700 dark:text-amber-400" />
         <div className="space-y-1 text-sm">
-          <p className="font-semibold text-amber-300">Before sharing expertise with remote LLMs</p>
-          <p className="text-amber-100/90">
+          <p className="font-semibold text-amber-900 dark:text-amber-300">
+            Before sharing expertise with remote LLMs
+          </p>
+          <p className="text-amber-800/95 dark:text-amber-100/90">
             Commercial LLM providers may learn from your queries and eventually redistribute that knowledge. Use remote providers only for <b>busy-work</b> (summarization, renaming, routine classification). For work where your expertise is the asset, prefer local models via Ollama.
           </p>
         </div>
@@ -109,12 +145,29 @@ function ProviderCard({
   const guide = PROVIDER_GUIDES[provider.providerName]
   const hasKey = provider.hasApiKey === 'Y'
   const isOllama = provider.providerName === 'Ollama'
+  const brand = BRAND[provider.providerName] ?? BRAND.Default
+  const active = isOllama || hasKey
 
   return (
-    <div className="rounded-md border border-border bg-card/60 p-4">
+    <div
+      className="relative overflow-hidden rounded-md border border-border bg-card/60 p-4"
+      style={{
+        backgroundImage: active
+          ? `linear-gradient(135deg, ${brand.tint} 0%, transparent 40%)`
+          : undefined
+      }}
+    >
+      <div
+        aria-hidden
+        className="absolute left-0 top-0 h-full w-1"
+        style={{ backgroundColor: active ? brand.solid : 'hsl(var(--muted))' }}
+      />
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="font-semibold">{provider.providerName}</span>
+          <BrandBadge providerName={provider.providerName} active={active} />
+          <span className="font-semibold" style={{ color: active ? brand.solid : undefined }}>
+            {provider.providerName}
+          </span>
           {provider.isDefault === 'Y' && <Badge variant="outline">Default</Badge>}
           {isOllama ? (
             <Badge variant="secondary">Local</Badge>
@@ -207,7 +260,7 @@ function TestResultLine({ result }: { result: LlmTestResult }) {
       className={cn(
         'mt-2 flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs',
         result.ok
-          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+          ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300'
           : 'border-destructive/30 bg-destructive/10 text-destructive'
       )}
     >

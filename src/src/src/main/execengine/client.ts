@@ -3,7 +3,9 @@ import type {
   Job,
   ProgressHistoryPoint,
   ProgressSummary,
-  TimeRange
+  TimeRange,
+  TopicDistribution,
+  TopicReviewItem
 } from '@shared/types'
 import { MockExecEngineClient } from './mock'
 
@@ -22,6 +24,13 @@ export interface IExecEngineClient {
 
   getIpfsStatus(): Promise<IpfsStatus>
   setIpfsAllocation(gb: number): Promise<void>
+
+  getTopicReview(): Promise<TopicReviewItem[]>
+  getTopicDistribution(): Promise<TopicDistribution[]>
+  rejectTopic(topicName: string): Promise<void>
+  renameTopic(from: string, to: string): Promise<void>
+  mergeTopic(from: string, into: string): Promise<void>
+  bumpGenerateTicks(): void
 }
 
 let client: IExecEngineClient | null = null

@@ -1,10 +1,26 @@
 import type {
   AppSettings,
+  ClassifiedFilename,
+  ClassifyRequest,
+  ClipboardPromptResult,
+  DataSource,
+  DataSourceState,
   DbMode,
+  DedupSummary,
+  DriveInfo,
   FileTypeFilter,
+  FilterPreset,
+  FilterPreviewResult,
+  FilterRuleSet,
   FolderRow,
+  FsEntry,
+  InsightsGroup,
+  InsightsListParams,
+  InsightsListResult,
   IpfsStatus,
   Job,
+  KnowledgeMapGraph,
+  KnowledgeMapParams,
   LlmModel,
   LlmProvider,
   LlmTestResult,
@@ -13,6 +29,7 @@ import type {
   ProgressSummary,
   SuperCategory,
   TimeRange,
+  TopicDistribution,
   TopicListResult,
   TopicReviewItem,
   WorkerStatus
@@ -32,9 +49,13 @@ export interface ElectronAPI {
     get: () => Promise<DbMode>
     set: (mode: DbMode) => Promise<void>
   }
+  dataSource: {
+    get: () => Promise<DataSourceState>
+    set: (next: DataSource) => Promise<DataSourceState>
+  }
   folders: {
     list: () => Promise<FolderRow[]>
-    add: (paths: string[]) => Promise<FolderRow[]>
+    add: (paths: string[], forceInclude?: 'Y' | 'N') => Promise<FolderRow[]>
     remove: (id: number) => Promise<void>
     updatePath: (id: number, newPath: string) => Promise<void>
     pickDirectory: () => Promise<string[]>
@@ -65,8 +86,13 @@ export interface ElectronAPI {
   topics: {
     list: () => Promise<TopicListResult>
     generate: (folderId?: number) => Promise<{ jobId: string }>
+    autoOrganize: () => Promise<{ jobId: string }>
     review: () => Promise<TopicReviewItem[]>
     approve: (items: TopicReviewItem[]) => Promise<void>
+    distribution: () => Promise<TopicDistribution[]>
+    reject: (topicName: string) => Promise<void>
+    rename: (from: string, to: string) => Promise<void>
+    merge: (from: string, into: string) => Promise<void>
   }
   superCategories: {
     list: () => Promise<SuperCategory[]>
@@ -88,6 +114,37 @@ export interface ElectronAPI {
     workers: () => Promise<WorkerStatus[]>
     restartWorker: (name: string) => Promise<void>
     tailLog: (name: string, lines?: number) => Promise<string>
+  }
+  system: {
+    openFile: (path: string) => Promise<{ via: 'localhost' | 'shell' | 'none' }>
+    revealFolder: (path: string) => Promise<{ via: 'localhost' | 'shell' }>
+    listDrives: () => Promise<DriveInfo[]>
+    listChildren: (path: string) => Promise<FsEntry[]>
+  }
+  insights: {
+    dedupSummary: () => Promise<DedupSummary>
+    list: (params?: InsightsListParams) => Promise<InsightsListResult>
+    groups: (params?: { search?: string }) => Promise<InsightsGroup[]>
+  }
+  filters: {
+    preview: (ruleSet: FilterRuleSet) => Promise<FilterPreviewResult>
+    listPresets: () => Promise<FilterPreset[]>
+    savePreset: (name: string, ruleSet: FilterRuleSet) => Promise<FilterPreset>
+    deletePreset: (id: number) => Promise<void>
+    classify: (req: ClassifyRequest) => Promise<{ jobId: string }>
+    onClassifyProgress: (
+      cb: (p: import('./types').ClassifyProgress) => void
+    ) => () => void
+    clipboardPrompt: (
+      filenames: import('./types').ClassifyFileInput[]
+    ) => Promise<ClipboardPromptResult>
+    clipboardApply: (
+      filenames: import('./types').ClassifyFileInput[],
+      responseText: string
+    ) => Promise<ClassifiedFilename[]>
+  }
+  knowledgeMap: {
+    graph: (params?: KnowledgeMapParams) => Promise<KnowledgeMapGraph>
   }
 }
 

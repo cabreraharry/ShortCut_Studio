@@ -1,5 +1,5 @@
-appId: com.scl.admin
-productName: SCL Admin
+appId: com.shortcut.studio
+productName: ShortCut Studio
 copyright: Copyright © 2026
 
 directories:
@@ -33,7 +33,7 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: SCL Admin
+  shortcutName: ShortCut Studio
 
 publish:
   provider: generic

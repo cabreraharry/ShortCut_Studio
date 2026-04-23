@@ -12,9 +12,14 @@ const api: ElectronAPI = {
     get: () => ipcRenderer.invoke(IpcChannel.ModeGet),
     set: (mode) => ipcRenderer.invoke(IpcChannel.ModeSet, mode)
   },
+  dataSource: {
+    get: () => ipcRenderer.invoke(IpcChannel.DataSourceGet),
+    set: (next) => ipcRenderer.invoke(IpcChannel.DataSourceSet, next)
+  },
   folders: {
     list: () => ipcRenderer.invoke(IpcChannel.FoldersList),
-    add: (paths) => ipcRenderer.invoke(IpcChannel.FoldersAdd, paths),
+    add: (paths, forceInclude) =>
+      ipcRenderer.invoke(IpcChannel.FoldersAdd, paths, forceInclude),
     remove: (id) => ipcRenderer.invoke(IpcChannel.FoldersRemove, id),
     updatePath: (id, newPath) =>
       ipcRenderer.invoke(IpcChannel.FoldersUpdatePath, id, newPath),
@@ -55,8 +60,13 @@ const api: ElectronAPI = {
     list: () => ipcRenderer.invoke(IpcChannel.TopicsList),
     generate: (folderId) =>
       ipcRenderer.invoke(IpcChannel.TopicsGenerate, folderId),
+    autoOrganize: () => ipcRenderer.invoke(IpcChannel.TopicsAutoOrganize),
     review: () => ipcRenderer.invoke(IpcChannel.TopicsReview),
-    approve: (items) => ipcRenderer.invoke(IpcChannel.TopicsApprove, items)
+    approve: (items) => ipcRenderer.invoke(IpcChannel.TopicsApprove, items),
+    distribution: () => ipcRenderer.invoke(IpcChannel.TopicsDistribution),
+    reject: (topicName) => ipcRenderer.invoke(IpcChannel.TopicsReject, topicName),
+    rename: (from, to) => ipcRenderer.invoke(IpcChannel.TopicsRename, from, to),
+    merge: (from, into) => ipcRenderer.invoke(IpcChannel.TopicsMerge, from, into)
   },
   superCategories: {
     list: () => ipcRenderer.invoke(IpcChannel.SuperCategoriesList),
@@ -89,6 +99,37 @@ const api: ElectronAPI = {
       ipcRenderer.invoke(IpcChannel.DiagnosticsRestartWorker, name),
     tailLog: (name, lines) =>
       ipcRenderer.invoke(IpcChannel.DiagnosticsTailLog, name, lines)
+  },
+  system: {
+    openFile: (path) => ipcRenderer.invoke(IpcChannel.SystemOpenFile, path),
+    revealFolder: (path) => ipcRenderer.invoke(IpcChannel.SystemRevealFolder, path),
+    listDrives: () => ipcRenderer.invoke(IpcChannel.SystemListDrives),
+    listChildren: (path) => ipcRenderer.invoke(IpcChannel.SystemListChildren, path)
+  },
+  insights: {
+    dedupSummary: () => ipcRenderer.invoke(IpcChannel.ProgressDedupSummary),
+    list: (params) => ipcRenderer.invoke(IpcChannel.InsightsList, params),
+    groups: (params) => ipcRenderer.invoke(IpcChannel.InsightsGroups, params)
+  },
+  filters: {
+    preview: (ruleSet) => ipcRenderer.invoke(IpcChannel.FiltersPreview, ruleSet),
+    listPresets: () => ipcRenderer.invoke(IpcChannel.FiltersListPresets),
+    savePreset: (name, ruleSet) =>
+      ipcRenderer.invoke(IpcChannel.FiltersSavePreset, name, ruleSet),
+    deletePreset: (id) => ipcRenderer.invoke(IpcChannel.FiltersDeletePreset, id),
+    classify: (req) => ipcRenderer.invoke(IpcChannel.FiltersClassify, req),
+    onClassifyProgress: (cb) => {
+      const listener = (_: unknown, p: import('@shared/types').ClassifyProgress): void => cb(p)
+      ipcRenderer.on(IpcChannel.FiltersClassifyProgress, listener)
+      return () => ipcRenderer.removeListener(IpcChannel.FiltersClassifyProgress, listener)
+    },
+    clipboardPrompt: (filenames) =>
+      ipcRenderer.invoke(IpcChannel.FiltersClipboardPrompt, filenames),
+    clipboardApply: (filenames, responseText) =>
+      ipcRenderer.invoke(IpcChannel.FiltersClipboardApply, filenames, responseText)
+  },
+  knowledgeMap: {
+    graph: (params) => ipcRenderer.invoke(IpcChannel.KnowledgeMapGraph, params)
   }
 }
 
