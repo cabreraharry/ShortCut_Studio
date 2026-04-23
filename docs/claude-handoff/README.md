@@ -1,4 +1,6 @@
-# Claude session handoff — SCL Admin unified rewrite
+# Claude session handoff — ShortCut Studio unified rewrite
+
+> **Naming note (2026-04-23):** the app was originally called "SCL Admin" during planning. It now ships as **ShortCut Studio** (productName, installer, GitHub repo `cabreraharry/ShortCut_Studio`). These docs were bulk-renamed in the 2026-04-23 cleanup; if you see a leftover "SCL_Admin" with underscore it usually refers to the original `.docx` brief filename (`UI_UX_For_SCL_Admin_Prompt_EW_26_04_18.docx`), which is preserved verbatim.
 
 **Purpose of this folder.** Catch-up material for any future Claude Code (or Claude Chat / Claude API / VS Code Claude extension) session that opens this repo. The original rewrite work was done in a terminal Claude Code session that isn't visible from VS Code's Claude-extension history. These docs capture all of it.
 

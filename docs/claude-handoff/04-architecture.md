@@ -37,8 +37,8 @@ D:/Client-Side_Project/ElectronAdmin2/
     ├── exe/                              LocalHostTools binaries (SCL_ListPorts.exe, …)
     ├── out/                              electron-vite build output (gitignored)
     ├── release-builds/                   electron-builder installer output (gitignored)
-    │   ├── win-unpacked/SCL Admin.exe    smoke-test target
-    │   └── SCL Admin-Setup-0.2.0.exe     NSIS installer
+    │   ├── win-unpacked/ShortCut Studio.exe    smoke-test target
+    │   └── ShortCut Studio-Setup-0.2.0.exe     NSIS installer
     └── src/
         ├── main/                         Electron main process (TypeScript)
         │   ├── index.ts                  entry: app.whenReady → init DB + IPC + workers + window + tray
@@ -156,9 +156,9 @@ Renderer:   React Query caches it under ['folders']
 
 | File | Owner | Access | Purpose |
 |---|---|---|---|
-| `src/src/db_files/loc_adm.db` | SCL_Admin | read+write (main process only) | admin config, LLM providers, OCR_Process, SuperCategories, etc. |
-| `D:/Client-Side_Project/SCL_Demo/db_files/SCLFolder_Publ.db` | SCL_Demo's scanner | **read-only** from SCL_Admin | public-mode scan data (Files, Folders, TopicNames, TopicFiles) |
-| `D:/Client-Side_Project/SCL_Demo/db_files/SCLFolder_Priv.db` | SCL_Demo's scanner | **read-only** from SCL_Admin | private-mode scan data |
+| `src/src/db_files/loc_adm.db` | ShortCut Studio | read+write (main process only) | admin config, LLM providers, OCR_Process, SuperCategories, etc. |
+| `D:/Client-Side_Project/SCL_Demo/db_files/SCLFolder_Publ.db` | SCL_Demo's scanner | **read-only** from ShortCut Studio | public-mode scan data (Files, Folders, TopicNames, TopicFiles) |
+| `D:/Client-Side_Project/SCL_Demo/db_files/SCLFolder_Priv.db` | SCL_Demo's scanner | **read-only** from ShortCut Studio | private-mode scan data |
 
 ### loc_adm.db schema (as migrations.ts creates it)
 

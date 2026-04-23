@@ -137,7 +137,7 @@ User enabled auto mode. Claude created a 12-task list and worked through each, c
 
 11. **Worker supervisor** — real implementation in `src/main/workers/supervisor.ts`: `WorkerHandle` ring-buffer logs, `spawnWorker` with env-var `WORKER_HEALTH_PORT` injection, stdout/stderr capture, exit handling with exponential backoff restart (max 5 attempts). `pingHealth` via `electron.net` GET `/health`. Companion Python module `SCL_Demo/tools/worker_api.py` — thread-based FastAPI wrapper with `/health` + `/status`, `set_status` / `update_status` / `get_status`. Integration guide `SCL_Demo/tools/WORKER_API_INTEGRATION.md` explaining how to adopt per worker + PyInstaller hiddenimports caveats.
 
-12. **NSIS installer** — first `npm run build:win` run failed because icon was 240×240 (electron-builder requires ≥256). Resized via Python PIL to a multi-size ICO (256, 128, 64, 48, 32, 16). Second run succeeded: 115 MB installer at `release-builds/SCL Admin-Setup-0.2.0.exe` plus `win-unpacked/` for smoke testing. Also updated the three project-scoped skills (`package-win`, `rebuild-native`, `sqlite-query`) to reference the new stack (electron-builder + better-sqlite3 instead of electron-packager + sqlite3).
+12. **NSIS installer** — first `npm run build:win` run failed because icon was 240×240 (electron-builder requires ≥256). Resized via Python PIL to a multi-size ICO (256, 128, 64, 48, 32, 16). Second run succeeded: 115 MB installer at `release-builds/ShortCut Studio-Setup-0.2.0.exe` plus `win-unpacked/` for smoke testing. Also updated the three project-scoped skills (`package-win`, `rebuild-native`, `sqlite-query`) to reference the new stack (electron-builder + better-sqlite3 instead of electron-packager + sqlite3).
 
 ### Validation during execution
 
@@ -145,7 +145,7 @@ User enabled auto mode. Claude created a 12-task list and worked through each, c
 
 ## Phase 7 — Post-execution
 
-- User asked *"how do I run and test it?"* → Claude explained `npm run dev`, `release-builds/win-unpacked/SCL Admin.exe`, and the full installer flow, plus a testing checklist of what to click through.
+- User asked *"how do I run and test it?"* → Claude explained `npm run dev`, `release-builds/win-unpacked/ShortCut Studio.exe`, and the full installer flow, plus a testing checklist of what to click through.
 - User showed VS Code open with stale Explorer content from before the rewrite → Claude wrote `.vscode/launch.json`, `tasks.json`, `settings.json`, `extensions.json` so F5 / Ctrl+Shift+B "just work" in VS Code. Force-added since `.vscode/` is gitignored.
 - User requested comprehensive handoff docs so a new Claude session in VS Code can catch up → **this folder.**
 

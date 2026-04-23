@@ -263,15 +263,15 @@ Integration guide at `SCL_Demo/tools/WORKER_API_INTEGRATION.md` — explains PyI
 ### Config
 `src/src/electron-builder.yml`:
 - `appId: com.scl.admin`
-- `productName: SCL Admin`
+- `productName: ShortCut Studio`
 - Output: `release-builds/` (NSIS .exe at root, `win-unpacked/` alongside for smoke testing)
 - `extraResources` copies `exe/` into the bundled app's `resources/exe/`
 - `asarUnpack` unpacks `resources/**` and `node_modules/better-sqlite3/**` (native module needs to live on the real filesystem, not inside asar)
 - NSIS options: `oneClick: false`, `allowToChangeInstallationDirectory: true`, `createDesktopShortcut: true`
 
 ### Output
-- **Installer:** `release-builds/SCL Admin-Setup-0.2.0.exe` (≈115 MB)
-- **Unpacked:** `release-builds/win-unpacked/SCL Admin.exe` + resources tree
+- **Installer:** `release-builds/ShortCut Studio-Setup-0.2.0.exe` (≈115 MB)
+- **Unpacked:** `release-builds/win-unpacked/ShortCut Studio.exe` + resources tree
 
 ### Known caveats
 

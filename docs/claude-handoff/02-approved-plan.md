@@ -6,7 +6,7 @@ This is a copy of the plan file that was approved before any code was written. T
 
 ---
 
-# Plan — Unified SCL_Admin Client (Centralized UI/UX)
+# Plan — Unified ShortCut Studio Client (Centralized UI/UX)
 
 ## Context
 
@@ -25,7 +25,7 @@ Users currently must run multiple programs to do one workflow. The UI looks date
 - A **community give-and-take model** — user shares CPU + disk (IPFS) in return for vastly faster global processing
 - Privacy-first — remote LLMs only for busy-work; the signature **Progress Glass** engagement feature keeps users returning
 
-**Goal of this plan:** Build one centralized client-side app (`SCL_Admin`) that replaces ElectronAdmin2 + SCL_Demo GUI and wraps the existing Python workers. Clean, modern UX for researchers. Wires for ExecEngine integration are in place but stubbed — real P2P integration follows when ExecEngine's FastAPI/Nginx layer ships.
+**Goal of this plan:** Build one centralized client-side app (`ShortCut_Studio`) that replaces ElectronAdmin2 + SCL_Demo GUI and wraps the existing Python workers. Clean, modern UX for researchers. Wires for ExecEngine integration are in place but stubbed — real P2P integration follows when ExecEngine's FastAPI/Nginx layer ships.
 
 ---
 

@@ -56,7 +56,7 @@ This is deterministic synthetic data that ONLY FEELS LIVE because time moves for
 
 Despite references in `SCL_Demo/tools/` to names that also exist in ExecEngine (`backups.db`, `swarm.db`, `mq.db`), SCL_Demo is fully independent. `sender.py` / `listener.py` are for its own P2P swarm on ports 4498/4499, not for ExecEngine's QUEUE. No imports of ExecEngine code anywhere in SCL_Demo.
 
-When the SCL_Admin client eventually wires to ExecEngine, it's a fresh integration — not inherited from SCL_Demo.
+When the ShortCut Studio client eventually wires to ExecEngine, it's a fresh integration — not inherited from SCL_Demo.
 
 ### 6. `loc_adm.db` schema columns called `VARCHAR(50)` actually hold arbitrary-length text
 

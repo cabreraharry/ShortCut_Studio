@@ -30,7 +30,7 @@ npm run build:win    # full NSIS installer — 2-5 min — run before a release
 
 ### Smoke-test the packaged app
 
-Double-click `release-builds/win-unpacked/SCL Admin.exe` after `npm run build:win`. Faster than re-installing.
+Double-click `release-builds/win-unpacked/ShortCut Studio.exe` after `npm run build:win`. Faster than re-installing.
 
 ### If `better_sqlite3.node` errors on launch
 

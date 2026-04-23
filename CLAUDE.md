@@ -10,7 +10,7 @@ Minimum reading order: `docs/claude-handoff/README.md` → `01-conversation-log.
 
 ## Project Overview
 
-**SCL Admin** — the unified client-side UI for the SCL document-processing ecosystem. A Windows-first Electron desktop app that gives researchers / academics one place to:
+**ShortCut Studio** — the unified client-side UI for the SCL document-processing ecosystem. A Windows-first Electron desktop app that gives researchers / academics one place to:
 
 - Pick which folders to scan for eBooks (PDF, EPUB, MOBI)
 - Configure LLM providers and API keys (Ollama, OpenAI, Claude, Gemini)
@@ -20,13 +20,13 @@ Minimum reading order: `docs/claude-handoff/README.md` → `01-conversation-log.
 - Maintain a list of private terms that route matching files to the Private DB
 - Diagnose background workers when something breaks
 
-The app is mid-**rewrite** from the old Bootstrap+jQuery Electron admin to a modern React + Vite + TypeScript + Tailwind + shadcn/ui stack. Folder is still called `ElectronAdmin2/` — it will be renamed to the final product name at a later milestone.
+Stack: Electron + Vite + React 18 + TypeScript + Tailwind + shadcn/ui. The Bootstrap+jQuery predecessor was deleted in the 2026-04-23 cleanup. The repo is hosted at https://github.com/cabreraharry/ShortCut_Studio. Local working folder is still `ElectronAdmin2/` — manual rename pending; the npm package name (`shortcut-studio`), Electron `productName` (`ShortCut Studio`), and Windows installer (`ShortCut Studio-Setup-<ver>.exe`) all already use the new identity.
 
 **Approved plan:** `C:/Users/harrycabrera/.claude/plans/okay-here-are-the-dapper-clarke.md`.
 
 ## Repository Layout
 
-All active work happens in `src/src/` (legacy nested folder — unchanged from the pre-rewrite layout to keep existing Claude Code skills pointing at the right place).
+All active work happens in `src/src/` (legacy nested folder — kept so existing Claude Code skills + VS Code tasks keep working without reconfiguration).
 
 ```
 ElectronAdmin2/
@@ -37,22 +37,30 @@ ElectronAdmin2/
 │       ├── tsconfig.json           refs tsconfig.node.json + tsconfig.web.json
 │       ├── tailwind.config.js
 │       ├── components.json         shadcn/ui config
-│       ├── electron-builder.yml    NSIS installer config
+│       ├── electron-builder.yml    NSIS installer config (productName: ShortCut Studio)
 │       ├── resources/
-│       │   ├── icon.ico            app + tray icon
+│       │   ├── icon.ico            app + tray icon (256×256 multi-res)
 │       │   └── info-messages.json  Info Section content (TODO: owner supplies)
 │       ├── db_files/
 │       │   └── loc_adm.db          SQLite admin DB (gitignored)
 │       ├── exe/                    SCL_Restart_PortIDs.exe + friends (spawned on boot)
-│       ├── release-builds/         electron-builder output
+│       ├── release-builds/         electron-builder output (gitignored)
+│       ├── scripts/
+│       │   └── storybook.ts        Playwright-driven page screenshotter → storybook/
+│       ├── storybook/              Generated UX storybook (md + screenshots) for AI feedback loop
 │       └── src/
 │           ├── main/               Electron main process
 │           │   ├── index.ts        entry: whenReady → init DB + handlers + window + tray
-│           │   ├── window.ts       BrowserWindow creation
-│           │   ├── tray.ts         system tray
+│           │   ├── window.ts       BrowserWindow + hide-on-close (tray-resident)
+│           │   ├── tray.ts         system tray (guarded with isDestroyed checks)
 │           │   ├── db/             better-sqlite3 connection + migrations
-│           │   ├── ipc/            one file per domain (folders, llm, topics, progress,
-│           │   │                   ipfs, privacy, diagnostics, settings, mode, app)
+│           │   ├── ipc/            one file per domain: folders, llm, topics, progress,
+│           │   │                   ipfs, privacy, diagnostics, settings, mode, app,
+│           │   │                   filters, insights, knowledgeMap, drives, dataSource, system
+│           │   ├── filters/        rule engine + provider adapters (Ollama, OpenAI, Claude,
+│           │   │                   Gemini, clipboard, http-json, mock)
+│           │   ├── mock/           seed/synthetic data for stubs
+│           │   ├── os/             drives, fs-preview, local-tools (Windows shell helpers)
 │           │   ├── workers/        supervisor (spawn/restart SCL_Demo .exes)
 │           │   └── execengine/     client.ts (IExecEngineClient) + mock.ts / real.ts
 │           ├── preload/
@@ -62,32 +70,38 @@ ElectronAdmin2/
 │           │   ├── main.tsx        React root + QueryClient + HashRouter
 │           │   ├── App.tsx         routes
 │           │   ├── components/
-│           │   │   ├── ui/         shadcn primitives (Button, Card, …)
-│           │   │   └── layout/     AppShell, Sidebar, Header, InfoSection
+│           │   │   ├── ui/         shadcn primitives (Button, Card, Toast, Tooltip, …)
+│           │   │   ├── layout/     AppShell, Sidebar, Header, InfoSection, AboutDialog
+│           │   │   ├── visual/     Hero, ColorfulStat, PeerNetwork, AllocationDisc, Burst,
+│           │   │   │               WorkerConstellation, ProviderHub, PrivacyShield, etc.
+│           │   │   └── drive-tree/ DriveTree (folder picker)
 │           │   ├── features/       one folder per sidebar section
-│           │   │   ├── dashboard/
+│           │   │   ├── dashboard/  + DedupCard, HoursSavedCard, ProgressGlass, TimeRangeBar
 │           │   │   ├── folders/
-│           │   │   ├── topics/
+│           │   │   ├── topics/     + TopicDistributionChart
+│           │   │   ├── insights/
+│           │   │   ├── knowledge-map/
+│           │   │   ├── filters/    rule builder + classify dialog + presets
 │           │   │   ├── llm/
 │           │   │   ├── community/
 │           │   │   ├── privacy/
 │           │   │   └── settings/
-│           │   ├── lib/            cn util, window.electronAPI wrapper
-│           │   ├── hooks/
+│           │   ├── lib/            cn util, api wrapper, app-info, mutation-toast
+│           │   ├── hooks/          use-count-up, use-debounced-value, use-row-selection, use-toast
 │           │   ├── stores/         Zustand
 │           │   └── styles/
 │           │       └── globals.css Tailwind + shadcn CSS vars, dark default
 │           └── shared/             used by BOTH main and renderer
 │               ├── ipc-channels.ts channel name constants
-│               ├── types.ts        domain types (FolderRow, Job, ProgressSummary, …)
+│               ├── types.ts        domain types
 │               └── api.ts          ElectronAPI interface (declares window.electronAPI)
-├── src_orig/src/                   OLDER snapshot of pre-rewrite code — DO NOT EDIT
-├── _Docu/                          design PDFs + screenshots (some owner-supplied)
+├── _Docu/                          design PDFs + screenshots (owner-supplied)
+├── docs/claude-handoff/            session-handoff narrative for new Claude/human collaborators
 ├── .claude/                        project-scoped agents / skills / commands
 └── README.md
 ```
 
-**Treat `src/src/` as the project root.** `src_orig/` is an older snapshot, kept for reference.
+**Treat `src/src/` as the project root.** The pre-rewrite Bootstrap+jQuery codebase + `src_orig/` snapshot were deleted in the 2026-04-23 cleanup; if you need historical reference, check `git log` rather than assuming a sibling folder.
 
 ## Run / Build / Package
 
@@ -204,7 +218,7 @@ When touching these, fix the root rather than working around it:
 
 ## Working with This Repo
 
-- **Always edit in `src/src/`.** Never `src_orig/`.
+- **Always edit in `src/src/`.** No other code-bearing folder exists post-cleanup.
 - **The plan file** is the source of truth for what ships in v1. Update it if scope changes.
 - **Memory files** live at `C:/Users/harrycabrera/.claude/projects/D--Client-Side-Project/memory/` and persist across sessions.
 - **Don't commit `*.db`** (gitignored). Schema changes in `migrations.ts` ARE committed.

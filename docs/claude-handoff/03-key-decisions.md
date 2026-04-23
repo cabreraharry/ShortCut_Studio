@@ -45,7 +45,7 @@ Every meaningful product / architectural / scope decision made during the sessio
 ## Scope decisions
 
 ### In-place rewrite of `ElectronAdmin2/`, not a new folder
-**Why:** The user pushed back when Claude defaulted to creating `SCL_Admin/`. The existing folder already had `icon.ico`, `db_files/`, `exe/`, `release-builds/`, and all project-scoped Claude Code skills + settings pointed at it. Standing up a parallel project meant churn with no real benefit — the old code was getting deleted anyway.
+**Why:** The user pushed back when Claude defaulted to creating `ShortCut Studio/`. The existing folder already had `icon.ico`, `db_files/`, `exe/`, `release-builds/`, and all project-scoped Claude Code skills + settings pointed at it. Standing up a parallel project meant churn with no real benefit — the old code was getting deleted anyway.
 **Implications:** Folder rename to a final product name is deferred; internal `package.json` name is `scl-admin`. **Saved as a feedback memory** at `C:/Users/harrycabrera/.claude/projects/D--Client-Side-Project/memory/feedback_inplace_rewrites.md` — future sessions should default to in-place rewrites when existing scaffolding is reusable.
 
 ### ExecEngine integration: mock client + swap point for v1

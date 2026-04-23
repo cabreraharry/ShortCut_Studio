@@ -26,13 +26,13 @@ Use `run_in_background: true` — the first run downloads Electron prebuilts (~1
 
 ## Output
 
-- **Installer**: `src/src/release-builds/SCL Admin-Setup-<version>.exe` (NSIS, ~115 MB)
-- **Unpacked app**: `src/src/release-builds/win-unpacked/SCL Admin.exe` — smoke-test without installing
+- **Installer**: `src/src/release-builds/ShortCut Studio-Setup-<version>.exe` (NSIS, ~115 MB)
+- **Unpacked app**: `src/src/release-builds/win-unpacked/ShortCut Studio.exe` — smoke-test without installing
 - **Update metadata**: `src/src/release-builds/latest.yml` — consumed by electron-updater once the auto-update feed is activated (v1.5)
 
 ## Verifying
 
-- Launch `release-builds/win-unpacked/SCL Admin.exe` to confirm the bundled app starts.
+- Launch `release-builds/win-unpacked/ShortCut Studio.exe` to confirm the bundled app starts.
 - Check the installer filename matches the `version` in `src/src/package.json`.
 - Confirm `release-builds/win-unpacked/resources/exe/` contains `SCL_ListPorts.exe` and siblings (bundled via `extraResources` in `electron-builder.yml`).
 
