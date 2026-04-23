@@ -1,9 +1,0 @@
-<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
-	<title>Prev (2)</title>
-	<defs>
-		<image  width="68" height="68" id="img1" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEQAAABEAQMAAAAC3QHxAAAAAXNSR0IB2cksfwAAAAZQTFRF////AAAAVcLTfgAAAAJ0Uk5TAP9bkSK1AAAAIElEQVR4nGNkAIIPAkCCcZRFDus/AwR8JMAaeJcOaRYAq71IBbhCU14AAAAASUVORK5CYII="/>
-	</defs>
-	<style>
-	</style>
-	<use id="Layer 8" href="#img1" x="30" y="30"/>
-</svg>
