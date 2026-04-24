@@ -9,8 +9,10 @@ import {
   AlertCircle,
   HardDrive,
   Keyboard,
-  Wrench
+  Wrench,
+  Rocket
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -48,6 +50,15 @@ export default function SettingsPage() {
 }
 
 function DeveloperTip() {
+  const navigate = useNavigate()
+  const qc = useQueryClient()
+  const rerunSetup = useMutation({
+    mutationFn: () => api.settings.update({ setupCompleted: false }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['settings'] })
+      navigate('/setup')
+    }
+  })
   return (
     <Card className="border-dashed bg-muted/20">
       <CardHeader className="pb-3">
@@ -56,7 +67,7 @@ function DeveloperTip() {
           Developer tools
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-0">
+      <CardContent className="space-y-3 pt-0">
         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1.5 rounded-md bg-background px-2 py-1 font-mono text-[11px] text-foreground shadow-sm">
             <Keyboard className="h-3 w-3" />
@@ -69,6 +80,21 @@ function DeveloperTip() {
             opens the developer overlay — SQL console, worker controls, live IPC
             inspector, and the storybook runner. Hidden by default so end users
             don’t see it.
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 border-t border-border/60 pt-3 text-xs text-muted-foreground">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => rerunSetup.mutate()}
+            disabled={rerunSetup.isPending}
+          >
+            <Rocket className="h-3 w-3" />
+            Re-run setup wizard
+          </Button>
+          <span>
+            Resets the first-run flag and drops you back into the onboarding
+            flow — useful for demoing to new users.
           </span>
         </div>
       </CardContent>

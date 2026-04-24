@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Moon, Sun, Activity, HelpCircle } from 'lucide-react'
 import { IconButton } from '@/components/ui/icon-button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Tip } from '@/components/ui/cursor-tooltip'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { useEffect, useState } from 'react'
@@ -35,34 +35,28 @@ export function Header() {
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
           <Wordmark />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="cursor-default text-xs font-normal text-muted-foreground">
-                v{APP_VERSION}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>
-              ShortCut Studio v{APP_VERSION} · built {APP_BUILD_DATE}
-            </TooltipContent>
-          </Tooltip>
+          <Tip content={`ShortCut Studio v${APP_VERSION} · built ${APP_BUILD_DATE}`}>
+            <span className="cursor-default text-xs font-normal text-muted-foreground">
+              v{APP_VERSION}
+            </span>
+          </Tip>
         </div>
         <div className="hidden items-center gap-1.5 md:flex">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span>
-                <StatusChip
-                  icon={<Activity className="h-3 w-3" />}
-                  label={runningJobs > 0 ? `${runningJobs} running` : 'idle'}
-                  active={runningJobs > 0}
-                />
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>
-              {runningJobs > 0
+          <Tip
+            content={
+              runningJobs > 0
                 ? `${runningJobs} background job${runningJobs === 1 ? '' : 's'} currently running`
-                : 'No background jobs running right now'}
-            </TooltipContent>
-          </Tooltip>
+                : 'No background jobs running right now'
+            }
+          >
+            <span>
+              <StatusChip
+                icon={<Activity className="h-3 w-3" />}
+                label={runningJobs > 0 ? `${runningJobs} running` : 'idle'}
+                active={runningJobs > 0}
+              />
+            </span>
+          </Tip>
         </div>
       </div>
       <div className="flex items-center gap-2">
@@ -116,42 +110,38 @@ function DataSourcePill(): JSX.Element {
       aria-label="Data source"
       className="inline-flex overflow-hidden rounded-full border border-border bg-muted/30"
     >
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            role="radio"
-            aria-checked={current === 'demo'}
-            onClick={() => setSource.mutate('demo')}
-            className={segmentClass(current === 'demo')}
-          >
-            Demo
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>Synthetic data for demonstration</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            role="radio"
-            aria-checked={current === 'prod'}
-            disabled={!prodAvailable}
-            onClick={() => prodAvailable && setSource.mutate('prod')}
-            className={cn(
-              segmentClass(current === 'prod'),
-              !prodAvailable && 'cursor-not-allowed opacity-50 hover:bg-transparent hover:text-muted-foreground'
-            )}
-          >
-            Prod
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>
-          {prodAvailable
+      <Tip content="Synthetic data for demonstration">
+        <button
+          type="button"
+          role="radio"
+          aria-checked={current === 'demo'}
+          onClick={() => setSource.mutate('demo')}
+          className={segmentClass(current === 'demo')}
+        >
+          Demo
+        </button>
+      </Tip>
+      <Tip
+        content={
+          prodAvailable
             ? 'Live data from the real backend'
-            : 'Production backend not yet available — staying in Demo'}
-        </TooltipContent>
-      </Tooltip>
+            : 'Production backend not yet available — staying in Demo'
+        }
+      >
+        <button
+          type="button"
+          role="radio"
+          aria-checked={current === 'prod'}
+          disabled={!prodAvailable}
+          onClick={() => prodAvailable && setSource.mutate('prod')}
+          className={cn(
+            segmentClass(current === 'prod'),
+            !prodAvailable && 'cursor-not-allowed opacity-50 hover:bg-transparent hover:text-muted-foreground'
+          )}
+        >
+          Prod
+        </button>
+      </Tip>
     </div>
   )
 }

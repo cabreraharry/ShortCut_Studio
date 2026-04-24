@@ -160,4 +160,12 @@ export function runMigrations(): void {
   // them back manually (via the "Add extension" input), their choice is
   // preserved since this only runs once per boot.
   db.prepare("DELETE FROM FileTypeFilters WHERE extension IN ('.azw3', '.djvu') AND enabled = 0").run()
+
+  // Idempotent column additions. SQLite's ALTER TABLE ADD COLUMN throws if
+  // the column already exists; wrap in try/catch.
+  try {
+    db.prepare('ALTER TABLE AdminData ADD COLUMN SetupCompleted INTEGER NOT NULL DEFAULT 0').run()
+  } catch {
+    // column already exists
+  }
 }

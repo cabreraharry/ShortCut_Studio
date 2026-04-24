@@ -8,6 +8,7 @@ interface AdminDbRow {
   Localhost_Port: number
   NumTopicThreshold: number
   CPU_Perf_Threshold: number
+  SetupCompleted: number
 }
 
 function toSettings(r: AdminDbRow): AppSettings {
@@ -15,7 +16,8 @@ function toSettings(r: AdminDbRow): AppSettings {
     recId: r.RecID,
     localhostPort: r.Localhost_Port,
     numTopicThreshold: r.NumTopicThreshold,
-    cpuPerfThreshold: r.CPU_Perf_Threshold
+    cpuPerfThreshold: r.CPU_Perf_Threshold,
+    setupCompleted: r.SetupCompleted === 1
   }
 }
 
@@ -42,6 +44,10 @@ export function registerSettingsHandlers(): void {
     if (patch.cpuPerfThreshold !== undefined) {
       fields.push('CPU_Perf_Threshold = ?')
       values.push(patch.cpuPerfThreshold)
+    }
+    if (patch.setupCompleted !== undefined) {
+      fields.push('SetupCompleted = ?')
+      values.push(patch.setupCompleted ? 1 : 0)
     }
     if (fields.length === 0) return
     values.push(1)

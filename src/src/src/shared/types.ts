@@ -12,6 +12,7 @@ export interface AppSettings {
   localhostPort: number
   numTopicThreshold: number
   cpuPerfThreshold: number
+  setupCompleted: boolean
 }
 
 export interface FolderRow {

@@ -13,12 +13,17 @@ import CommunityPage from './features/community/CommunityPage'
 import PrivacyPage from './features/privacy/PrivacyPage'
 import SettingsPage from './features/settings/SettingsPage'
 import AboutPage from './features/about/AboutPage'
+import GettingStartedPage from './features/getting-started/GettingStartedPage'
+import SetupWizard from './features/setup/SetupWizard'
+import { FirstRunGuard } from './features/setup/FirstRunGuard'
 
 export default function App() {
   return (
     <TooltipProvider delayDuration={300} skipDelayDuration={100}>
       <AppShell>
+        <FirstRunGuard>
         <Routes>
+          <Route path="/setup" element={<SetupWizard />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/folders" element={<FoldersPage />} />
@@ -31,7 +36,9 @@ export default function App() {
           <Route path="/privacy" element={<PrivacyPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/about" element={<AboutPage />} />
+          <Route path="/getting-started" element={<GettingStartedPage />} />
         </Routes>
+        </FirstRunGuard>
         <Toaster />
       </AppShell>
     </TooltipProvider>

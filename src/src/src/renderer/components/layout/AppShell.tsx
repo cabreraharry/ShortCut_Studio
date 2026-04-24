@@ -1,4 +1,5 @@
 import { useEffect, type ReactNode } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 import { InfoSection } from './InfoSection'
@@ -12,11 +13,24 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const toggleOverlay = useDevModeStore((s) => s.toggleOverlay)
+  const location = useLocation()
+  const isSetupRoute = location.pathname === '/setup'
 
   useEffect(() => {
     const off = api.dev.onToggle(() => toggleOverlay())
     return off
   }, [toggleOverlay])
+
+  // The setup wizard is a full-screen takeover with no sidebar / header / info
+  // section, so it can focus the user on one task without distraction.
+  if (isSetupRoute) {
+    return (
+      <div className="flex h-full flex-col bg-background text-foreground">
+        {children}
+        <DevOverlay />
+      </div>
+    )
+  }
 
   return (
     <div className="flex h-full flex-col bg-background text-foreground">

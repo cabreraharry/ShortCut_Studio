@@ -1,0 +1,51 @@
+{
+  "_readme": "Copy source for the Getting Started page. Sections tagged `_status: \"draft\"` still need owner review; flip to `final` once approved.",
+  "version": 1,
+  "tagline": {
+    "_status": "draft",
+    "text": "A short guide to your first 10 minutes with ShortCut Studio."
+  },
+  "beforeYouStart": {
+    "_status": "draft",
+    "heading": "Before you start",
+    "body": "ShortCut Studio works best when you point it at an existing library of PDFs, EPUBs, or research papers. You'll want at least one folder in mind, and either Ollama running locally or an API key for OpenAI / Claude / Gemini. You can skip the LLM and add it later — topic classification just won't run until one is configured.",
+    "checklist": [
+      "At least one folder with eBooks or papers",
+      "Ollama installed locally (recommended) OR an API key you're willing to use",
+      "A few minutes to review the private-terms list under Privacy"
+    ]
+  },
+  "firstSteps": {
+    "_status": "draft",
+    "heading": "First steps",
+    "note": "The buttons below jump directly to each page. Most people can skim these in five minutes."
+  },
+  "workflows": {
+    "_status": "draft",
+    "heading": "Common workflows",
+    "items": [
+      {
+        "title": "Add a new folder",
+        "body": "Folders → Add folder. Pick a parent directory; subfolders you don't want are added as excludes under it."
+      },
+      {
+        "title": "Re-run topic generation on a folder",
+        "body": "Topics → Generate topics. Queues a job; progress shows on the Dashboard."
+      },
+      {
+        "title": "Switch between public and private",
+        "body": "Header → toggle DEMO / PROD. Public mode uses your shared library; Private uses files matched by your private terms."
+      },
+      {
+        "title": "Back up your config",
+        "body": "Your config lives at %AppData%\\ShortCut Studio\\db_files\\loc_adm.db. Copy that file before upgrading if you want a safety net."
+      }
+    ]
+  },
+  "help": {
+    "_status": "draft",
+    "heading": "Where to get help",
+    "body": "If something breaks, press Ctrl+Shift+D to open the developer overlay — the Workers tab shows whether background processes are alive, and the SQL console can inspect the local DB. For feature requests or bug reports, contact your team lead.",
+    "note": "Contact channel (email / Discord / GitHub) — OWNER TO PROVIDE."
+  }
+}
