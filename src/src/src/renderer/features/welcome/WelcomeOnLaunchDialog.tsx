@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Sparkles, FolderPlus, Bot, ListChecks } from 'lucide-react'
+import { Sparkles, FolderPlus, Bot, ListChecks, Lightbulb, Keyboard } from 'lucide-react'
 import { api } from '@/lib/api'
 import aboutContent from '@/features/about/content.json'
 import { cn } from '@/lib/utils'
 
-const AUTO_DISMISS_MS = 5200
+const AUTO_DISMISS_MS = 10_000
 const FADE_OUT_MS = 280
-const HINT_DELAY_MS = 1600
+const HINT_DELAY_MS = 3_000
 
 const STEPS = [
   {
@@ -27,6 +27,36 @@ const STEPS = [
     blurb: 'Let AI surface what your library is about.'
   }
 ]
+
+const PRO_TIPS = [
+  {
+    title: 'Pro tip',
+    body: 'Press',
+    kbd: 'Ctrl+Shift+D',
+    after: 'any time to open the developer overlay — SQL console, IPC inspector, and live worker controls.'
+  },
+  {
+    title: 'Did you know?',
+    body: 'Everything stays on this machine. Files, keys, and the SQLite database — nothing uploads unless you explicitly send a file to an LLM provider.',
+    kbd: '',
+    after: ''
+  },
+  {
+    title: 'Power move',
+    body: 'Ollama runs entirely local. Install it, pick a model, and your most sensitive research never touches a commercial API.',
+    kbd: '',
+    after: ''
+  },
+  {
+    title: 'Keyboard shortcut',
+    body: 'Hit',
+    kbd: 'Esc',
+    after: 'to skip this screen immediately. Or wait it out — your call.'
+  }
+]
+
+// Pick one tip per app launch so the splash feels fresh across sessions.
+const SELECTED_TIP = PRO_TIPS[Math.floor(Math.random() * PRO_TIPS.length)]
 
 /**
  * Full-screen launch splash. Shows once per session on app startup (unless
@@ -123,11 +153,28 @@ export function WelcomeOnLaunchDialog(): JSX.Element | null {
           <Sparkles className="h-3 w-3" />
           Welcome back
         </div>
-        <p className="mt-4 max-w-xl text-sm text-muted-foreground opacity-0 animate-in fade-in duration-500 [animation-delay:500ms] [animation-fill-mode:forwards] md:text-base">
+
+        <h2 className="mt-6 text-2xl font-semibold tracking-tight opacity-0 animate-in fade-in duration-500 [animation-delay:500ms] [animation-fill-mode:forwards] md:text-3xl">
+          Your library, searchable by{' '}
+          <span className="bg-gradient-to-r from-glass-local via-primary to-glass-peer bg-clip-text text-transparent">
+            idea
+          </span>
+          .
+        </h2>
+        <p className="mt-3 max-w-xl text-sm text-muted-foreground opacity-0 animate-in fade-in duration-500 [animation-delay:650ms] [animation-fill-mode:forwards] md:text-base">
           {aboutContent.tagline.text}
         </p>
 
-        <div className="mt-8 grid w-full gap-3 sm:grid-cols-3">
+        <div className="mt-7 opacity-0 animate-in fade-in duration-500 [animation-delay:800ms] [animation-fill-mode:forwards]">
+          <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+            Three moves to get started
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground/80">
+            No wizard required — each page walks you through it.
+          </div>
+        </div>
+
+        <div className="mt-4 grid w-full gap-3 sm:grid-cols-3">
           {STEPS.map((s, i) => (
             <StepCard
               key={i}
@@ -135,14 +182,16 @@ export function WelcomeOnLaunchDialog(): JSX.Element | null {
               icon={s.icon}
               label={s.label}
               blurb={s.blurb}
-              delay={700 + i * 180}
+              delay={1000 + i * 180}
             />
           ))}
         </div>
 
+        <ProTipCallout delay={1800} />
+
         <div
           className={cn(
-            'mt-10 text-[11px] text-muted-foreground/70 transition-opacity duration-300',
+            'mt-8 text-[11px] text-muted-foreground/70 transition-opacity duration-300',
             hintVisible ? 'opacity-100' : 'opacity-0'
           )}
         >
@@ -190,6 +239,40 @@ function StepCard({ index, icon: Icon, label, blurb, delay }: StepCardProps): JS
       </div>
       <div className="text-sm font-semibold">{label}</div>
       <div className="mt-0.5 text-xs text-muted-foreground">{blurb}</div>
+    </div>
+  )
+}
+
+function ProTipCallout({ delay }: { delay: number }): JSX.Element {
+  const tip = SELECTED_TIP
+  return (
+    <div
+      className="mt-6 flex w-full max-w-xl items-start gap-3 rounded-xl border border-primary/25 bg-primary/5 p-3 text-left opacity-0 backdrop-blur-sm"
+      style={{
+        animation: `splashCard 500ms ease-out ${delay}ms forwards`
+      }}
+    >
+      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
+        <Lightbulb className="h-3 w-3" />
+      </span>
+      <div className="min-w-0 flex-1 text-xs">
+        <div className="text-[10px] font-semibold uppercase tracking-widest text-primary">
+          {tip.title}
+        </div>
+        <div className="mt-0.5 leading-relaxed text-muted-foreground">
+          {tip.body}
+          {tip.kbd && (
+            <>
+              {' '}
+              <span className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-background/70 px-1.5 py-0.5 align-middle font-mono text-[10px] text-foreground">
+                <Keyboard className="h-2.5 w-2.5" />
+                {tip.kbd}
+              </span>{' '}
+              {tip.after}
+            </>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
