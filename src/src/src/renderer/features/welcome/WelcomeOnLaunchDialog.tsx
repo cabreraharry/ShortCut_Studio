@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Sparkles, FolderPlus, Bot, ListChecks, Lightbulb, Keyboard, ShieldCheck, Cpu, Cloud } from 'lucide-react'
+import { Sparkles, FolderPlus, Bot, ListChecks, Lightbulb, Keyboard, ShieldCheck, Cpu, Cloud, ArrowRight } from 'lucide-react'
 import { api } from '@/lib/api'
 import aboutContent from '@/features/about/content.json'
 import { cn } from '@/lib/utils'
@@ -210,13 +210,29 @@ export function WelcomeOnLaunchDialog(): JSX.Element | null {
 
         <ProTipCallout delay={1950} />
 
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            startFadeOut()
+          }}
+          className="group mt-8 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-glass-local via-primary to-glass-peer px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/25 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/30 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background"
+          style={{
+            opacity: 0,
+            animation: 'splashCard 500ms ease-out 2100ms forwards'
+          }}
+        >
+          Get started
+          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+        </button>
+
         <div
           className={cn(
-            'mt-8 text-xs font-semibold text-muted-foreground transition-opacity duration-300',
+            'mt-3 text-[11px] text-muted-foreground/70 transition-opacity duration-300',
             hintVisible ? 'opacity-100' : 'opacity-0'
           )}
         >
-          Click anywhere to continue
+          or click anywhere / press Esc
         </div>
       </div>
 
