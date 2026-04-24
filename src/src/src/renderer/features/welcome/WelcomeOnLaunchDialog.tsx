@@ -1,14 +1,32 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, FolderPlus, Bot, ListChecks } from 'lucide-react'
 import { api } from '@/lib/api'
 import aboutContent from '@/features/about/content.json'
 import { cn } from '@/lib/utils'
 
-const AUTO_DISMISS_MS = 2600
+const AUTO_DISMISS_MS = 5200
 const FADE_OUT_MS = 280
-const HINT_DELAY_MS = 700
+const HINT_DELAY_MS = 1600
+
+const STEPS = [
+  {
+    icon: FolderPlus,
+    label: 'Pick your folders',
+    blurb: 'PDFs, papers, eBooks — wherever they live.'
+  },
+  {
+    icon: Bot,
+    label: 'Connect an LLM',
+    blurb: 'Local Ollama or an API key you control.'
+  },
+  {
+    icon: ListChecks,
+    label: 'Discover topics',
+    blurb: 'Let AI surface what your library is about.'
+  }
+]
 
 /**
  * Full-screen launch splash. Shows once per session on app startup (unless
@@ -91,11 +109,11 @@ export function WelcomeOnLaunchDialog(): JSX.Element | null {
         Don't show on startup
       </button>
 
-      <div className="relative flex flex-col items-center text-center">
+      <div className="relative flex max-w-3xl flex-col items-center px-6 text-center">
         <div className="animate-[splashFloat_3s_ease-in-out_infinite]">
           <SplashGlyph />
         </div>
-        <h1 className="mt-6 text-4xl font-bold tracking-tight opacity-0 animate-in fade-in duration-500 [animation-delay:200ms] [animation-fill-mode:forwards] md:text-5xl">
+        <h1 className="mt-5 text-4xl font-bold tracking-tight opacity-0 animate-in fade-in duration-500 [animation-delay:150ms] [animation-fill-mode:forwards] md:text-5xl">
           <span className="bg-gradient-to-r from-glass-local via-primary to-glass-peer bg-clip-text text-transparent">
             ShortCut
           </span>{' '}
@@ -105,9 +123,23 @@ export function WelcomeOnLaunchDialog(): JSX.Element | null {
           <Sparkles className="h-3 w-3" />
           Welcome back
         </div>
-        <p className="mt-5 max-w-md text-sm text-muted-foreground opacity-0 animate-in fade-in duration-500 [animation-delay:500ms] [animation-fill-mode:forwards]">
+        <p className="mt-4 max-w-xl text-sm text-muted-foreground opacity-0 animate-in fade-in duration-500 [animation-delay:500ms] [animation-fill-mode:forwards] md:text-base">
           {aboutContent.tagline.text}
         </p>
+
+        <div className="mt-8 grid w-full gap-3 sm:grid-cols-3">
+          {STEPS.map((s, i) => (
+            <StepCard
+              key={i}
+              index={i + 1}
+              icon={s.icon}
+              label={s.label}
+              blurb={s.blurb}
+              delay={700 + i * 180}
+            />
+          ))}
+        </div>
+
         <div
           className={cn(
             'mt-10 text-[11px] text-muted-foreground/70 transition-opacity duration-300',
@@ -123,7 +155,41 @@ export function WelcomeOnLaunchDialog(): JSX.Element | null {
           0%, 100% { transform: translateY(0px); }
           50% { transform: translateY(-8px); }
         }
+        @keyframes splashCard {
+          from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
       `}</style>
+    </div>
+  )
+}
+
+interface StepCardProps {
+  index: number
+  icon: React.ComponentType<{ className?: string }>
+  label: string
+  blurb: string
+  delay: number
+}
+
+function StepCard({ index, icon: Icon, label, blurb, delay }: StepCardProps): JSX.Element {
+  return (
+    <div
+      className="group relative overflow-hidden rounded-xl border border-border/50 bg-background/40 p-4 text-left opacity-0 backdrop-blur-sm"
+      style={{
+        animation: `splashCard 500ms ease-out ${delay}ms forwards`
+      }}
+    >
+      <div className="mb-2 flex items-center gap-2">
+        <span className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-glass-local/30 to-glass-peer/30 text-primary shadow-sm">
+          <Icon className="h-3.5 w-3.5" />
+        </span>
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Step {index}
+        </span>
+      </div>
+      <div className="text-sm font-semibold">{label}</div>
+      <div className="mt-0.5 text-xs text-muted-foreground">{blurb}</div>
     </div>
   )
 }
