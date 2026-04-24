@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -32,10 +32,22 @@ export default function SetupWizard(): JSX.Element {
     mutationFn: () => api.settings.update({ setupCompleted: true })
   })
 
+  // Flip the setup-completed flag as soon as the user has seen the wizard.
+  // If they close the window mid-flow or walk away without clicking "Go to
+  // Dashboard", we still don't want to re-prompt on next launch — they know
+  // about the wizard and can re-run it from Settings. The fields the wizard
+  // sets (folders, LLM) persist independently of the flag.
+  const markedRef = useRef(false)
+  useEffect(() => {
+    if (markedRef.current) return
+    markedRef.current = true
+    api.settings
+      .update({ setupCompleted: true })
+      .then(() => qc.invalidateQueries({ queryKey: ['settings'] }))
+  }, [qc])
+
   async function finish(): Promise<void> {
     await finishMutation.mutateAsync()
-    // Invalidate + refetch so FirstRunGuard sees setupCompleted=true before
-    // it gets a chance to redirect us back to /setup.
     await qc.invalidateQueries({ queryKey: ['settings'] })
     navigate('/dashboard', { replace: true })
   }

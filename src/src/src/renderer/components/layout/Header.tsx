@@ -148,9 +148,9 @@ function DataSourcePill(): JSX.Element {
 
 function Wordmark(): JSX.Element {
   return (
-    <span className="flex items-center gap-1.5">
+    <span className="flex items-center gap-2">
       <WordmarkGlyph />
-      <span className="text-sm font-semibold tracking-tight">
+      <span className="text-base font-semibold tracking-tight">
         <span className="bg-gradient-to-r from-glass-local via-primary to-glass-peer bg-clip-text text-transparent">
           ShortCut
         </span>{' '}
@@ -162,7 +162,7 @@ function Wordmark(): JSX.Element {
 
 function WordmarkGlyph(): JSX.Element {
   return (
-    <svg viewBox="0 0 20 24" className="h-5 w-4" aria-hidden="true">
+    <svg viewBox="0 0 20 24" className="h-7 w-6" aria-hidden="true">
       <defs>
         <linearGradient id="wm-grad" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="hsl(var(--glass-peer))" />
