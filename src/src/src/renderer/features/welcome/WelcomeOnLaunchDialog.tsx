@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Sparkles, FolderPlus, Bot, ListChecks, Lightbulb, Keyboard } from 'lucide-react'
+import { Sparkles, FolderPlus, Bot, ListChecks, Lightbulb, Keyboard, ShieldCheck, Cpu, Cloud } from 'lucide-react'
 import { api } from '@/lib/api'
 import aboutContent from '@/features/about/content.json'
 import { cn } from '@/lib/utils'
@@ -143,29 +143,53 @@ export function WelcomeOnLaunchDialog(): JSX.Element | null {
         <div className="animate-[splashFloat_3s_ease-in-out_infinite]">
           <SplashGlyph />
         </div>
-        <h1 className="mt-5 text-4xl font-bold tracking-tight opacity-0 animate-in fade-in duration-500 [animation-delay:150ms] [animation-fill-mode:forwards] md:text-5xl">
+        <h1
+          className="mt-5 text-4xl font-bold tracking-tight md:text-5xl"
+          style={{ opacity: 0, animation: 'splashFade 500ms ease-out 150ms forwards' }}
+        >
           <span className="bg-gradient-to-r from-glass-local via-primary to-glass-peer bg-clip-text text-transparent">
             ShortCut
           </span>{' '}
           <span className="text-foreground">Studio</span>
         </h1>
-        <div className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-widest text-primary opacity-0 animate-in fade-in duration-500 [animation-delay:350ms] [animation-fill-mode:forwards]">
+        <div
+          className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-widest text-primary"
+          style={{ opacity: 0, animation: 'splashFade 500ms ease-out 350ms forwards' }}
+        >
           <Sparkles className="h-3 w-3" />
           Welcome back
         </div>
 
-        <h2 className="mt-6 text-2xl font-semibold tracking-tight opacity-0 animate-in fade-in duration-500 [animation-delay:500ms] [animation-fill-mode:forwards] md:text-3xl">
+        <h2
+          className="mt-6 text-2xl font-semibold tracking-tight md:text-3xl"
+          style={{ opacity: 0, animation: 'splashFade 500ms ease-out 500ms forwards' }}
+        >
           Your library, searchable by{' '}
           <span className="bg-gradient-to-r from-glass-local via-primary to-glass-peer bg-clip-text text-transparent">
             idea
           </span>
           .
         </h2>
-        <p className="mt-3 max-w-xl text-sm text-muted-foreground opacity-0 animate-in fade-in duration-500 [animation-delay:650ms] [animation-fill-mode:forwards] md:text-base">
+        <p
+          className="mt-3 max-w-xl text-sm text-muted-foreground md:text-base"
+          style={{ opacity: 0, animation: 'splashFade 500ms ease-out 650ms forwards' }}
+        >
           {aboutContent.tagline.text}
         </p>
 
-        <div className="mt-7 opacity-0 animate-in fade-in duration-500 [animation-delay:800ms] [animation-fill-mode:forwards]">
+        <div
+          className="mt-5 flex flex-wrap items-center justify-center gap-2"
+          style={{ opacity: 0, animation: 'splashFade 500ms ease-out 800ms forwards' }}
+        >
+          <FeaturePill icon={<ShieldCheck className="h-3 w-3" />} label="Privacy-first" />
+          <FeaturePill icon={<Cpu className="h-3 w-3" />} label="Local-first" />
+          <FeaturePill icon={<Cloud className="h-3 w-3" />} label="No cloud uploads" />
+        </div>
+
+        <div
+          className="mt-7"
+          style={{ opacity: 0, animation: 'splashFade 500ms ease-out 950ms forwards' }}
+        >
           <div className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
             Three moves to get started
           </div>
@@ -182,12 +206,12 @@ export function WelcomeOnLaunchDialog(): JSX.Element | null {
               icon={s.icon}
               label={s.label}
               blurb={s.blurb}
-              delay={1000 + i * 180}
+              delay={1150 + i * 180}
             />
           ))}
         </div>
 
-        <ProTipCallout delay={1800} />
+        <ProTipCallout delay={1950} />
 
         <div
           className={cn(
@@ -206,6 +230,10 @@ export function WelcomeOnLaunchDialog(): JSX.Element | null {
         }
         @keyframes splashCard {
           from { opacity: 0; transform: translateY(12px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes splashFade {
+          from { opacity: 0; transform: translateY(6px); }
           to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
@@ -240,6 +268,21 @@ function StepCard({ index, icon: Icon, label, blurb, delay }: StepCardProps): JS
       <div className="text-sm font-semibold">{label}</div>
       <div className="mt-0.5 text-xs text-muted-foreground">{blurb}</div>
     </div>
+  )
+}
+
+function FeaturePill({
+  icon,
+  label
+}: {
+  icon: JSX.Element
+  label: string
+}): JSX.Element {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/50 px-2.5 py-1 text-[11px] font-medium text-foreground/80 backdrop-blur-sm">
+      <span className="text-primary">{icon}</span>
+      {label}
+    </span>
   )
 }
 
