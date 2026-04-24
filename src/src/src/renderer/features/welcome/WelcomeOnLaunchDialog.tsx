@@ -1,43 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Sparkles, FolderPlus, Bot, ListChecks, ArrowRight } from 'lucide-react'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
+import { Sparkles } from 'lucide-react'
 import { api } from '@/lib/api'
-import { APP_NAME } from '@/lib/app-info'
+import aboutContent from '@/features/about/content.json'
+import { cn } from '@/lib/utils'
 
-const STEPS = [
-  {
-    icon: FolderPlus,
-    title: 'Pick your folders',
-    blurb: 'Point us at the PDFs and papers you already have.',
-    tone: 'from-glass-local/30 to-glass-peer/20'
-  },
-  {
-    icon: Bot,
-    title: 'Connect an LLM',
-    blurb: 'Local Ollama, or any API key you control.',
-    tone: 'from-primary/30 to-glass-local/20'
-  },
-  {
-    icon: ListChecks,
-    title: 'Discover topics',
-    blurb: 'Let AI surface what your library is really about.',
-    tone: 'from-glass-peer/30 to-primary/20'
-  }
-]
+const AUTO_DISMISS_MS = 2600
+const FADE_OUT_MS = 280
+const HINT_DELAY_MS = 700
 
 /**
- * Lightweight launch-time welcome. Shows once per session on app startup
- * (unless the user has unchecked the welcomeOnStartup setting) and never
- * while the first-run setup wizard is in control of the screen.
+ * Full-screen launch splash. Shows once per session on app startup (unless
+ * welcomeOnStartup is off). Dismisses on click, Escape, or after ~2.6s.
+ * Suppressed on /setup where the wizard already owns the screen.
  */
 export function WelcomeOnLaunchDialog(): JSX.Element | null {
   const location = useLocation()
@@ -48,7 +24,8 @@ export function WelcomeOnLaunchDialog(): JSX.Element | null {
     staleTime: 30_000
   })
   const [dismissed, setDismissed] = useState(false)
-  const [dontShowAgain, setDontShowAgain] = useState(false)
+  const [fadingOut, setFadingOut] = useState(false)
+  const [hintVisible, setHintVisible] = useState(false)
 
   const updateSetting = useMutation({
     mutationFn: (next: boolean) =>
@@ -56,110 +33,198 @@ export function WelcomeOnLaunchDialog(): JSX.Element | null {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] })
   })
 
-  // Reset session-dismiss whenever the setting is flipped on in another part
-  // of the app (e.g. Re-enable from Settings). Harmless no-op otherwise.
+  const shouldRender =
+    !!settings?.welcomeOnStartup &&
+    !dismissed &&
+    location.pathname !== '/setup'
+
+  // Auto-dismiss timer + keyboard handler. Only runs while the splash is
+  // actually mounted and active.
   useEffect(() => {
-    if (settings?.welcomeOnStartup) setDismissed(false)
-  }, [settings?.welcomeOnStartup])
-
-  if (!settings) return null
-  if (!settings.welcomeOnStartup) return null
-  if (location.pathname === '/setup') return null
-
-  const open = !dismissed
-  const welcomeOn = settings.welcomeOnStartup
-
-  function handleClose(): void {
-    if (dontShowAgain && welcomeOn) {
-      updateSetting.mutate(false)
+    if (!shouldRender) return
+    const dismissTimer = setTimeout(() => startFadeOut(), AUTO_DISMISS_MS)
+    const hintTimer = setTimeout(() => setHintVisible(true), HINT_DELAY_MS)
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+        startFadeOut()
+      }
     }
-    setDismissed(true)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      clearTimeout(dismissTimer)
+      clearTimeout(hintTimer)
+      window.removeEventListener('keydown', onKey)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shouldRender])
+
+  function startFadeOut(): void {
+    setFadingOut(true)
+    setTimeout(() => setDismissed(true), FADE_OUT_MS)
   }
 
+  function handleDontShow(e: React.MouseEvent): void {
+    e.stopPropagation()
+    updateSetting.mutate(false)
+    startFadeOut()
+  }
+
+  if (!shouldRender) return null
+
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && handleClose()}>
-      <DialogContent className="max-w-xl overflow-hidden p-0">
-        <WelcomeBackdrop />
-        <div className="relative p-6">
-          <DialogHeader>
-            <div className="mb-2 inline-flex items-center gap-2 self-start rounded-full border border-primary/30 bg-background/60 px-3 py-0.5 text-[11px] font-medium text-primary backdrop-blur">
-              <Sparkles className="h-3 w-3" />
-              Welcome back
-            </div>
-            <DialogTitle className="text-2xl tracking-tight">
-              Ready to explore{' '}
-              <span className="bg-gradient-to-r from-glass-local via-primary to-glass-peer bg-clip-text text-transparent">
-                {APP_NAME}?
-              </span>
-            </DialogTitle>
-            <DialogDescription className="text-sm">
-              Three easy steps turn your library into something you can actually search by idea.
-            </DialogDescription>
-          </DialogHeader>
+    <div
+      onClick={startFadeOut}
+      role="presentation"
+      className={cn(
+        'fixed inset-0 z-[100] flex cursor-pointer items-center justify-center overflow-hidden transition-opacity',
+        fadingOut ? 'opacity-0 duration-300' : 'opacity-100 duration-300'
+      )}
+    >
+      <SplashBackdrop />
 
-          <div className="mt-4 space-y-2">
-            {STEPS.map((s, i) => {
-              const Icon = s.icon
-              return (
-                <div
-                  key={i}
-                  className={`relative flex items-start gap-3 overflow-hidden rounded-lg bg-gradient-to-br ${s.tone} p-3`}
-                >
-                  <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-background/60 text-primary shadow-sm">
-                    <Icon className="h-3.5 w-3.5" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                      Step {i + 1}
-                    </div>
-                    <div className="text-sm font-semibold">{s.title}</div>
-                    <div className="text-xs text-muted-foreground">{s.blurb}</div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
+      {/* Don't-show link — top-right corner, doesn't trigger backdrop dismiss */}
+      <button
+        type="button"
+        onClick={handleDontShow}
+        className="absolute right-4 top-4 rounded-md px-2 py-1 text-[11px] text-muted-foreground/80 transition-colors hover:bg-background/40 hover:text-foreground"
+      >
+        Don't show on startup
+      </button>
 
-          <div className="mt-5 flex items-center justify-between gap-4">
-            <label className="flex cursor-pointer items-center gap-2 text-[11px] text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={dontShowAgain}
-                onChange={(e) => setDontShowAgain(e.target.checked)}
-                className="h-3 w-3 cursor-pointer accent-primary"
-              />
-              Don't show this on startup
-            </label>
-            <Button onClick={handleClose}>
-              Let's go <ArrowRight className="h-3 w-3" />
-            </Button>
-          </div>
+      <div className="relative flex flex-col items-center text-center">
+        <div className="animate-[splashFloat_3s_ease-in-out_infinite]">
+          <SplashGlyph />
         </div>
-      </DialogContent>
-    </Dialog>
+        <h1 className="mt-6 text-4xl font-bold tracking-tight opacity-0 animate-in fade-in duration-500 [animation-delay:200ms] [animation-fill-mode:forwards] md:text-5xl">
+          <span className="bg-gradient-to-r from-glass-local via-primary to-glass-peer bg-clip-text text-transparent">
+            ShortCut
+          </span>{' '}
+          <span className="text-foreground">Studio</span>
+        </h1>
+        <div className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-widest text-primary opacity-0 animate-in fade-in duration-500 [animation-delay:350ms] [animation-fill-mode:forwards]">
+          <Sparkles className="h-3 w-3" />
+          Welcome back
+        </div>
+        <p className="mt-5 max-w-md text-sm text-muted-foreground opacity-0 animate-in fade-in duration-500 [animation-delay:500ms] [animation-fill-mode:forwards]">
+          {aboutContent.tagline.text}
+        </p>
+        <div
+          className={cn(
+            'mt-10 text-[11px] text-muted-foreground/70 transition-opacity duration-300',
+            hintVisible ? 'opacity-100' : 'opacity-0'
+          )}
+        >
+          Click anywhere to continue
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes splashFloat {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-8px); }
+        }
+      `}</style>
+    </div>
   )
 }
 
-function WelcomeBackdrop(): JSX.Element {
+function SplashGlyph(): JSX.Element {
   return (
     <svg
-      aria-hidden
-      className="pointer-events-none absolute inset-0 h-full w-full opacity-50"
-      viewBox="0 0 600 400"
-      preserveAspectRatio="xMidYMid slice"
+      viewBox="0 0 80 96"
+      className="h-24 w-20 drop-shadow-[0_8px_32px_rgba(99,102,241,0.25)] animate-in fade-in zoom-in-90 duration-500"
+      aria-hidden="true"
     >
       <defs>
-        <radialGradient id="welcome-dialog-a" cx="15%" cy="20%" r="40%">
-          <stop offset="0%" stopColor="hsl(var(--glass-local))" stopOpacity="0.22" />
-          <stop offset="100%" stopColor="hsl(var(--glass-local))" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="welcome-dialog-b" cx="85%" cy="80%" r="45%">
-          <stop offset="0%" stopColor="hsl(var(--glass-peer))" stopOpacity="0.22" />
-          <stop offset="100%" stopColor="hsl(var(--glass-peer))" stopOpacity="0" />
+        <linearGradient id="splash-body" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="hsl(var(--glass-peer))" />
+          <stop offset="100%" stopColor="hsl(var(--glass-local))" />
+        </linearGradient>
+        <radialGradient id="splash-shine" cx="30%" cy="25%" r="55%">
+          <stop offset="0%" stopColor="white" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="white" stopOpacity="0" />
         </radialGradient>
       </defs>
-      <rect width="600" height="400" fill="url(#welcome-dialog-a)" />
-      <rect width="600" height="400" fill="url(#welcome-dialog-b)" />
+      <path
+        d="M 20 8 L 60 8 L 60 16 L 68 24 L 68 76 A 12 12 0 0 1 56 88 L 24 88 A 12 12 0 0 1 12 76 L 12 24 L 20 16 Z"
+        fill="url(#splash-body)"
+        fillOpacity="0.92"
+      />
+      <path
+        d="M 20 8 L 60 8 L 60 16 L 68 24 L 68 76 A 12 12 0 0 1 56 88 L 24 88 A 12 12 0 0 1 12 76 L 12 24 L 20 16 Z"
+        fill="url(#splash-shine)"
+      />
+      <rect
+        x="20"
+        y="52"
+        width="40"
+        height="32"
+        fill="hsl(var(--glass-local))"
+        fillOpacity="0.95"
+      />
+      <circle cx="40" cy="68" r="5" fill="white" fillOpacity="0.95" />
     </svg>
+  )
+}
+
+function SplashBackdrop(): JSX.Element {
+  return (
+    <>
+      <div className="absolute inset-0 bg-background/85 backdrop-blur-xl" />
+      <svg
+        aria-hidden
+        className="pointer-events-none absolute inset-0 h-full w-full"
+        viewBox="0 0 1600 1000"
+        preserveAspectRatio="xMidYMid slice"
+      >
+        <defs>
+          <radialGradient id="splash-glow-a" cx="25%" cy="20%" r="40%">
+            <stop offset="0%" stopColor="hsl(var(--glass-local))" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="hsl(var(--glass-local))" stopOpacity="0" />
+          </radialGradient>
+          <radialGradient id="splash-glow-b" cx="75%" cy="80%" r="45%">
+            <stop offset="0%" stopColor="hsl(var(--glass-peer))" stopOpacity="0.35" />
+            <stop offset="100%" stopColor="hsl(var(--glass-peer))" stopOpacity="0" />
+          </radialGradient>
+          <radialGradient id="splash-glow-c" cx="50%" cy="50%" r="35%">
+            <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.2" />
+            <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+        <rect width="1600" height="1000" fill="url(#splash-glow-a)" />
+        <rect width="1600" height="1000" fill="url(#splash-glow-b)" />
+        <rect width="1600" height="1000" fill="url(#splash-glow-c)" />
+        {Array.from({ length: 18 }).map((_, i) => {
+          const cx = (i * 197) % 1600
+          const cy = (i * 113) % 1000
+          const r = 1.5 + ((i * 2) % 4)
+          const color =
+            i % 3 === 0
+              ? 'hsl(var(--primary))'
+              : i % 3 === 1
+                ? 'hsl(var(--glass-local))'
+                : 'hsl(var(--glass-peer))'
+          return (
+            <circle
+              key={i}
+              cx={cx}
+              cy={cy}
+              r={r}
+              fill={color}
+              fillOpacity="0.35"
+              style={{
+                animation: `splashTwinkle ${3 + (i % 4)}s ease-in-out ${i * 0.18}s infinite`
+              }}
+            />
+          )
+        })}
+      </svg>
+      <style>{`
+        @keyframes splashTwinkle {
+          0%, 100% { opacity: 0.25; transform: scale(0.8); }
+          50% { opacity: 0.7; transform: scale(1.1); }
+        }
+      `}</style>
+    </>
   )
 }
