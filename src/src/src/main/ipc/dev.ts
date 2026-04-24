@@ -31,9 +31,11 @@ const BANNED_SQL_KEYWORDS = [
   'TRIGGER'
 ]
 
-function projectRootDir(): string {
+function projectRootDir(): string | null {
   // __dirname in dev: <repo>/src/src/out/main → project root is ../../
-  // __dirname when packaged: resources/app.asar/out/main (storybook won't work here anyway)
+  // Packaged: __dirname is inside resources/app.asar — there is no meaningful
+  // "project root" in a packaged install; storybook is a source-tree artifact.
+  if (app.isPackaged) return null
   return resolve(__dirname, '../..')
 }
 
@@ -168,6 +170,17 @@ export function registerDevHandlers(): void {
 
   ipcMain.handle(IpcChannel.DevGetStorybookInfo, (): DevStorybookInfo => {
     const root = projectRootDir()
+    if (!root) {
+      // Packaged build — no source tree, no storybook to report on.
+      return {
+        available: false,
+        mtime: null,
+        screenshotCount: 0,
+        unpackedExists: false,
+        unpackedPath: '',
+        storybookDir: ''
+      }
+    }
     const storybookDir = join(root, 'storybook')
     const screenshotsDir = join(storybookDir, 'screenshots')
     const mdPath = join(storybookDir, 'STORYBOOK.md')
@@ -179,6 +192,7 @@ export function registerDevHandlers(): void {
     }
     const unpackedPath = join(root, 'release-builds', 'win-unpacked', 'ShortCut Studio.exe')
     return {
+      available: true,
       mtime,
       screenshotCount: countScreenshots(screenshotsDir),
       unpackedExists: existsSync(unpackedPath),
@@ -190,7 +204,9 @@ export function registerDevHandlers(): void {
   ipcMain.handle(
     IpcChannel.DevListStorybookScreenshots,
     async (): Promise<DevStorybookScreenshot[]> => {
-      const dir = join(projectRootDir(), 'storybook', 'screenshots')
+      const root = projectRootDir()
+      if (!root) return []
+      const dir = join(root, 'storybook', 'screenshots')
       if (!existsSync(dir)) return []
       const files = readdirSync(dir)
         .filter((f) => /\.(png|jpg|jpeg|webp)$/i.test(f))
@@ -220,11 +236,19 @@ export function registerDevHandlers(): void {
   )
 
   ipcMain.handle(IpcChannel.DevOpenStorybookFolder, async () => {
-    const storybookDir = join(projectRootDir(), 'storybook')
+    const root = projectRootDir()
+    if (!root) {
+      // Packaged build: no source tree. Open the resources folder instead so
+      // the user sees a real Explorer window (not the app-chooser dialog that
+      // appears when shell.openPath is pointed at app.asar).
+      await shell.openPath(process.resourcesPath)
+      return
+    }
+    const storybookDir = join(root, 'storybook')
     if (existsSync(storybookDir)) {
       await shell.openPath(storybookDir)
     } else {
-      await shell.openPath(projectRootDir())
+      await shell.openPath(root)
     }
   })
 
@@ -242,6 +266,13 @@ export function registerDevHandlers(): void {
       focused?.webContents.send(IpcChannel.DevStorybookLog, payload)
     }
     const cwd = projectRootDir()
+    if (!cwd) {
+      return {
+        ok: false,
+        exitCode: null,
+        error: 'storybook regeneration requires a source tree (not available in packaged builds)'
+      }
+    }
     send({
       stream: 'system',
       line: `$ npm run storybook  (cwd=${cwd})`,

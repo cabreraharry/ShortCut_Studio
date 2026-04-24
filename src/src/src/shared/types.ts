@@ -354,7 +354,7 @@ export interface DevPaths {
   resources: string
   locAdmDb: string
   workersDir: string | null
-  projectRoot: string
+  projectRoot: string | null
   isPackaged: boolean
 }
 
@@ -369,6 +369,7 @@ export interface DevSqlResult {
 }
 
 export interface DevStorybookInfo {
+  available: boolean
   mtime: number | null
   screenshotCount: number
   unpackedExists: boolean

@@ -52,9 +52,19 @@ export function StorybookTab(): JSX.Element {
   }
 
   const hasUnpacked = info?.unpackedExists ?? false
+  const available = info?.available ?? true
 
   return (
     <div className="space-y-4">
+      {!available && (
+        <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-[11px] text-muted-foreground">
+          Storybook regeneration is dev-only — it's only available when running
+          from the source tree (<span className="font-mono">npm run dev</span>).
+          Open folder will open the app's <span className="font-mono">resources/</span>{' '}
+          folder instead.
+        </div>
+      )}
+
       <section className="rounded-md border border-border/60 bg-muted/20 p-3 text-xs">
         <div className="flex items-center justify-between">
           <div className="font-semibold">Last run</div>
@@ -68,32 +78,44 @@ export function StorybookTab(): JSX.Element {
             value={info?.mtime ? new Date(info.mtime).toLocaleString() : '(never)'}
           />
           <KV label="Screenshots" value={info ? String(info.screenshotCount) : '—'} />
-          <KV
-            label="Packaged build"
-            value={hasUnpacked ? 'found ✓' : 'missing — run npm run build:win first'}
-            tone={hasUnpacked ? 'ok' : 'warn'}
-          />
+          {available && (
+            <KV
+              label="Packaged build"
+              value={hasUnpacked ? 'found ✓' : 'missing — run npm run build:win first'}
+              tone={hasUnpacked ? 'ok' : 'warn'}
+            />
+          )}
         </div>
       </section>
 
-      <section className="space-y-2">
-        <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-[11px] text-amber-900 dark:text-amber-300">
-          Regenerate spawns <span className="font-mono">npm run storybook</span>, which
-          launches a second Electron instance against{' '}
-          <span className="font-mono">release-builds/win-unpacked</span>. Make sure{' '}
-          <span className="font-mono">npm run build</span> has run recently — this
-          running instance is unaffected.
-        </div>
+      {available && (
+        <section className="space-y-2">
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-[11px] text-amber-900 dark:text-amber-300">
+            Regenerate spawns <span className="font-mono">npm run storybook</span>, which
+            launches a second Electron instance against{' '}
+            <span className="font-mono">release-builds/win-unpacked</span>. Make sure{' '}
+            <span className="font-mono">npm run build</span> has run recently — this
+            running instance is unaffected.
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={run} disabled={running}>
+              <PlayCircle className="h-3 w-3" />
+              {running ? 'Running…' : 'Regenerate'}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => api.dev.openStorybookFolder()}>
+              <FolderOpen className="h-3 w-3" /> Open folder
+            </Button>
+          </div>
+        </section>
+      )}
+
+      {!available && (
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={run} disabled={running}>
-            <PlayCircle className="h-3 w-3" />
-            {running ? 'Running…' : 'Regenerate'}
-          </Button>
           <Button size="sm" variant="outline" onClick={() => api.dev.openStorybookFolder()}>
-            <FolderOpen className="h-3 w-3" /> Open folder
+            <FolderOpen className="h-3 w-3" /> Open resources folder
           </Button>
         </div>
-      </section>
+      )}
 
       {screenshots.length > 0 && (
         <section>
