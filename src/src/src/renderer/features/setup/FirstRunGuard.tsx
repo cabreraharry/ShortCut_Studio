@@ -17,12 +17,20 @@ export function FirstRunGuard({ children }: { children: ReactNode }): JSX.Elemen
   const navigate = useNavigate()
   const location = useLocation()
 
+  // Storybook capture loads each route with ?screenshot=1. We must not
+  // redirect to /setup in that case, or all captured screenshots would
+  // show the setup wizard instead of their intended routes.
+  const isScreenshotMode =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).has('screenshot')
+
   useEffect(() => {
     if (!settings) return
+    if (isScreenshotMode) return
     if (!settings.setupCompleted && location.pathname !== '/setup') {
       navigate('/setup', { replace: true })
     }
-  }, [settings, location.pathname, navigate])
+  }, [settings, location.pathname, navigate, isScreenshotMode])
 
   if (isLoading || !settings) {
     return (
@@ -34,7 +42,11 @@ export function FirstRunGuard({ children }: { children: ReactNode }): JSX.Elemen
   }
 
   // If we're about to redirect, render nothing briefly.
-  if (!settings.setupCompleted && location.pathname !== '/setup') {
+  if (
+    !settings.setupCompleted &&
+    location.pathname !== '/setup' &&
+    !isScreenshotMode
+  ) {
     return <></>
   }
 
