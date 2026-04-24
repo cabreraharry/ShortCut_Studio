@@ -31,7 +31,7 @@ export default function App() {
           <Route path="/topics" element={<TopicsPage />} />
           <Route path="/insights" element={<InsightsPage />} />
           <Route path="/filters" element={<FilterWorkbenchPage />} />
-          <Route path="/knowledge-map" element={<KnowledgeMapPage />} />
+          <Route path="/topic-map" element={<KnowledgeMapPage />} />
           <Route path="/llm" element={<LlmPage />} />
           <Route path="/community" element={<CommunityPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />

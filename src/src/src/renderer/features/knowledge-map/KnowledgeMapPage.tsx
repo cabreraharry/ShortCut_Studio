@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { Network, Sparkles } from 'lucide-react'
@@ -44,6 +44,33 @@ export default function KnowledgeMapPage(): JSX.Element {
     return graph.nodes.find((n) => n.id === selectedId) ?? null
   }, [graph, selectedId])
 
+  // Walk through every node in order. Wraps at both ends. If nothing is
+  // selected yet, Next starts at the first node and Prev at the last.
+  const stepSelection = useCallback(
+    (dir: 1 | -1): void => {
+      if (!graph || graph.nodes.length === 0) return
+      const nodes = graph.nodes
+      if (!selectedId) {
+        setSelectedId(nodes[dir === 1 ? 0 : nodes.length - 1].id)
+        return
+      }
+      const idx = nodes.findIndex((n) => n.id === selectedId)
+      if (idx === -1) {
+        setSelectedId(nodes[0].id)
+        return
+      }
+      const nextIdx = (idx + dir + nodes.length) % nodes.length
+      setSelectedId(nodes[nextIdx].id)
+    },
+    [graph, selectedId]
+  )
+
+  const selectionPos = useMemo(() => {
+    if (!graph || !selectedId) return { current: 0, total: graph?.nodes.length ?? 0 }
+    const idx = graph.nodes.findIndex((n) => n.id === selectedId)
+    return { current: idx >= 0 ? idx + 1 : 0, total: graph.nodes.length }
+  }, [graph, selectedId])
+
   const superCategories = useMemo(
     () => (graph?.nodes ?? []).filter((n) => n.kind === 'superCategory'),
     [graph]
@@ -56,10 +83,10 @@ export default function KnowledgeMapPage(): JSX.Element {
       <div>
         <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
           <Network className="h-6 w-6" />
-          Knowledge Map
+          Topic Map
         </h1>
         <p className="text-sm text-muted-foreground">
-          Your library as a constellation. Click any node for details.
+          Your library as a constellation. Click any node for details, or use the arrows to walk through every node.
         </p>
       </div>
 
@@ -70,6 +97,10 @@ export default function KnowledgeMapPage(): JSX.Element {
         onSuperCategoryChange={setSuperCategoryId}
         superCategories={superCategories}
         stats={graph?.stats}
+        onStepPrev={() => stepSelection(-1)}
+        onStepNext={() => stepSelection(1)}
+        selectionCurrent={selectionPos.current}
+        selectionTotal={selectionPos.total}
       />
 
       <div className="grid min-h-[560px] flex-1 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
@@ -82,7 +113,7 @@ export default function KnowledgeMapPage(): JSX.Element {
             <EmptyState
               variant="topics"
               title="No topics yet"
-              description="The Knowledge Map builds itself from your AI-generated topics. Run topic generation first, then come back here."
+              description="The Topic Map builds itself from your AI-generated topics. Run topic generation first, then come back here."
               action={
                 <Button onClick={() => navigate('/topics')}>
                   <Sparkles className="mr-2 h-4 w-4" />

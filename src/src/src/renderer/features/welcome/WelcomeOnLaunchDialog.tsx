@@ -6,7 +6,6 @@ import { api } from '@/lib/api'
 import aboutContent from '@/features/about/content.json'
 import { cn } from '@/lib/utils'
 
-const AUTO_DISMISS_MS = 10_000
 const FADE_OUT_MS = 280
 const HINT_DELAY_MS = 3_000
 
@@ -30,10 +29,10 @@ const STEPS = [
 
 const PRO_TIPS = [
   {
-    title: 'Pro tip',
-    body: 'Press',
-    kbd: 'Ctrl+Shift+D',
-    after: 'any time to open the developer overlay — SQL console, IPC inspector, and live worker controls.'
+    title: 'Workflow tip',
+    body: 'Configure more than one LLM — use Ollama for sensitive work and a remote API for routine busywork. Switch per-task from the LLMs page.',
+    kbd: '',
+    after: ''
   },
   {
     title: 'Did you know?',
@@ -86,11 +85,10 @@ export function WelcomeOnLaunchDialog(): JSX.Element | null {
     !dismissed &&
     location.pathname !== '/setup'
 
-  // Auto-dismiss timer + keyboard handler. Only runs while the splash is
-  // actually mounted and active.
+  // Keyboard handler + hint-reveal timer. No auto-dismiss — user reads at
+  // their own pace and dismisses with click / Enter / Space / Esc.
   useEffect(() => {
     if (!shouldRender) return
-    const dismissTimer = setTimeout(() => startFadeOut(), AUTO_DISMISS_MS)
     const hintTimer = setTimeout(() => setHintVisible(true), HINT_DELAY_MS)
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
@@ -99,7 +97,6 @@ export function WelcomeOnLaunchDialog(): JSX.Element | null {
     }
     window.addEventListener('keydown', onKey)
     return () => {
-      clearTimeout(dismissTimer)
       clearTimeout(hintTimer)
       window.removeEventListener('keydown', onKey)
     }
@@ -134,7 +131,7 @@ export function WelcomeOnLaunchDialog(): JSX.Element | null {
       <button
         type="button"
         onClick={handleDontShow}
-        className="absolute right-4 top-4 rounded-md px-2 py-1 text-[11px] text-muted-foreground/80 transition-colors hover:bg-background/40 hover:text-foreground"
+        className="absolute right-4 top-4 rounded-md px-2 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-background/40 hover:text-foreground"
       >
         Don't show on startup
       </button>
@@ -215,7 +212,7 @@ export function WelcomeOnLaunchDialog(): JSX.Element | null {
 
         <div
           className={cn(
-            'mt-8 text-[11px] text-muted-foreground/70 transition-opacity duration-300',
+            'mt-8 text-xs font-semibold text-muted-foreground transition-opacity duration-300',
             hintVisible ? 'opacity-100' : 'opacity-0'
           )}
         >

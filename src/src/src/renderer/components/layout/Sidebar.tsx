@@ -55,8 +55,8 @@ const SECTIONS: Array<{ label: string; items: NavItem[] }> = [
         tip: 'Extraction quality per file — spot low-confidence documents'
       },
       {
-        to: '/knowledge-map',
-        label: 'Knowledge Map',
+        to: '/topic-map',
+        label: 'Topic Map',
         icon: Network,
         tip: 'See how your library is organized: super-categories → topics → sample files'
       }
