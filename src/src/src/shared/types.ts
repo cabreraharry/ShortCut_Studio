@@ -13,6 +13,7 @@ export interface AppSettings {
   numTopicThreshold: number
   cpuPerfThreshold: number
   setupCompleted: boolean
+  welcomeOnStartup: boolean
 }
 
 export interface FolderRow {

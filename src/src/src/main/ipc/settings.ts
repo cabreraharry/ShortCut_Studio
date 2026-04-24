@@ -9,6 +9,7 @@ interface AdminDbRow {
   NumTopicThreshold: number
   CPU_Perf_Threshold: number
   SetupCompleted: number
+  WelcomeOnStartup: number
 }
 
 function toSettings(r: AdminDbRow): AppSettings {
@@ -17,7 +18,8 @@ function toSettings(r: AdminDbRow): AppSettings {
     localhostPort: r.Localhost_Port,
     numTopicThreshold: r.NumTopicThreshold,
     cpuPerfThreshold: r.CPU_Perf_Threshold,
-    setupCompleted: r.SetupCompleted === 1
+    setupCompleted: r.SetupCompleted === 1,
+    welcomeOnStartup: r.WelcomeOnStartup !== 0
   }
 }
 
@@ -48,6 +50,10 @@ export function registerSettingsHandlers(): void {
     if (patch.setupCompleted !== undefined) {
       fields.push('SetupCompleted = ?')
       values.push(patch.setupCompleted ? 1 : 0)
+    }
+    if (patch.welcomeOnStartup !== undefined) {
+      fields.push('WelcomeOnStartup = ?')
+      values.push(patch.welcomeOnStartup ? 1 : 0)
     }
     if (fields.length === 0) return
     values.push(1)

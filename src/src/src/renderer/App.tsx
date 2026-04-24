@@ -16,6 +16,7 @@ import AboutPage from './features/about/AboutPage'
 import GettingStartedPage from './features/getting-started/GettingStartedPage'
 import SetupWizard from './features/setup/SetupWizard'
 import { FirstRunGuard } from './features/setup/FirstRunGuard'
+import { WelcomeOnLaunchDialog } from './features/welcome/WelcomeOnLaunchDialog'
 
 export default function App() {
   return (
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="/getting-started" element={<GettingStartedPage />} />
         </Routes>
         </FirstRunGuard>
+        <WelcomeOnLaunchDialog />
         <Toaster />
       </AppShell>
     </TooltipProvider>

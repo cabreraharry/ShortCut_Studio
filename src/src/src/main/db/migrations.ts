@@ -168,4 +168,9 @@ export function runMigrations(): void {
   } catch {
     // column already exists
   }
+  try {
+    db.prepare('ALTER TABLE AdminData ADD COLUMN WelcomeOnStartup INTEGER NOT NULL DEFAULT 1').run()
+  } catch {
+    // column already exists
+  }
 }
