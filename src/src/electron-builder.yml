@@ -14,18 +14,6 @@ extraResources:
   - from: exe
     to: exe
     filter: ['**/*']
-  # SCL_Demo worker binaries. Supervisor expects them at
-  # resources/workers/ in packaged builds; resolveWorkersDir() falls
-  # back to the sibling SCL_Demo/_exe path only in dev.
-  - from: ../../../SCL_Demo/_exe
-    to: workers
-    filter:
-      - root_watchdog.exe
-      - topic_watchdog.exe
-      - gemini_processor.exe
-      - filescanner.exe
-      - rescan.exe
-      - postprocessing.exe
 
 asarUnpack:
   - resources/**
