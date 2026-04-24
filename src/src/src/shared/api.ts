@@ -12,6 +12,7 @@ import type {
   DevSqlResult,
   DevStorybookInfo,
   DevStorybookScreenshot,
+  SystemCheckResult,
   DriveInfo,
   FileTypeFilter,
   FilterPreset,
@@ -166,6 +167,7 @@ export interface ElectronAPI {
       cb: (p: import('./types').DevStorybookLog) => void
     ) => () => void
     onToggle: (cb: () => void) => () => void
+    systemCheck: () => Promise<SystemCheckResult>
   }
 }
 

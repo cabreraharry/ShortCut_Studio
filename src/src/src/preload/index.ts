@@ -156,7 +156,8 @@ const api: ElectronAPI = {
       const listener = (): void => cb()
       ipcRenderer.on(IpcChannel.DevToggle, listener)
       return () => ipcRenderer.removeListener(IpcChannel.DevToggle, listener)
-    }
+    },
+    systemCheck: () => ipcRenderer.invoke(IpcChannel.DevSystemCheck)
   }
 }
 

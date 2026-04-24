@@ -6,7 +6,8 @@ import { WorkersTab } from './WorkersTab'
 import { SqlConsoleTab } from './SqlConsoleTab'
 import { IpcInspectorTab } from './IpcInspectorTab'
 import { StorybookTab } from './StorybookTab'
-import { Wrench, Cpu, Database, Radio, Camera } from 'lucide-react'
+import { SystemCheckTab } from './SystemCheckTab'
+import { Wrench, Cpu, Database, Radio, Camera, ClipboardCheck } from 'lucide-react'
 
 export function DevOverlay(): JSX.Element {
   const isOpen = useDevModeStore((s) => s.isOpen)
@@ -35,26 +36,30 @@ export function DevOverlay(): JSX.Element {
           className="flex min-h-0 flex-1 flex-col"
         >
           <div className="px-5 pt-3">
-            <TabsList className="grid h-8 w-full grid-cols-5">
-              <TabsTrigger value="devtools" className="gap-1">
+            <TabsList className="grid h-8 w-full grid-cols-6">
+              <TabsTrigger value="devtools" className="gap-1 text-[11px]">
                 <Wrench className="h-3 w-3" />
                 <span>Tools</span>
               </TabsTrigger>
-              <TabsTrigger value="workers" className="gap-1">
+              <TabsTrigger value="workers" className="gap-1 text-[11px]">
                 <Cpu className="h-3 w-3" />
                 <span>Workers</span>
               </TabsTrigger>
-              <TabsTrigger value="sql" className="gap-1">
+              <TabsTrigger value="sql" className="gap-1 text-[11px]">
                 <Database className="h-3 w-3" />
                 <span>SQL</span>
               </TabsTrigger>
-              <TabsTrigger value="ipc" className="gap-1">
+              <TabsTrigger value="ipc" className="gap-1 text-[11px]">
                 <Radio className="h-3 w-3" />
                 <span>IPC</span>
               </TabsTrigger>
-              <TabsTrigger value="storybook" className="gap-1">
+              <TabsTrigger value="storybook" className="gap-1 text-[11px]">
                 <Camera className="h-3 w-3" />
                 <span>Story</span>
+              </TabsTrigger>
+              <TabsTrigger value="system" className="gap-1 text-[11px]">
+                <ClipboardCheck className="h-3 w-3" />
+                <span>System</span>
               </TabsTrigger>
             </TabsList>
           </div>
@@ -74,6 +79,9 @@ export function DevOverlay(): JSX.Element {
             </TabsContent>
             <TabsContent value="storybook" className="mt-0">
               <StorybookTab />
+            </TabsContent>
+            <TabsContent value="system" className="mt-0">
+              <SystemCheckTab />
             </TabsContent>
           </div>
         </Tabs>

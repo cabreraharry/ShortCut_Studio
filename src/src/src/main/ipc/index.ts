@@ -17,6 +17,7 @@ import { registerDriveHandlers } from './drives'
 import { registerFilterHandlers } from './filters'
 import { registerKnowledgeMapHandlers } from './knowledgeMap'
 import { registerDevHandlers } from './dev'
+import { registerSystemCheckHandlers } from './system-check'
 
 export function registerIpcHandlers(): void {
   registerAppHandlers()
@@ -38,4 +39,5 @@ export function registerIpcHandlers(): void {
   registerFilterHandlers()
   registerKnowledgeMapHandlers()
   registerDevHandlers()
+  registerSystemCheckHandlers()
 }

@@ -399,3 +399,25 @@ export interface DevStorybookScreenshot {
   dataUrl: string
   sizeBytes: number
 }
+
+/**
+ * System-check surface for Dev-mode "System" tab. Today reports actual
+ * status for the SCL_Demo workers + Ollama; IPFS + nginx are reserved
+ * for the v2 ExecEngine integration.
+ */
+export type SystemCheckStatus = 'ok' | 'missing' | 'error' | 'reserved'
+
+export interface SystemCheckItem {
+  status: SystemCheckStatus
+  detail?: string
+  version?: string
+  hintUrl?: string
+  hintLabel?: string
+}
+
+export interface SystemCheckResult {
+  workers: SystemCheckItem
+  ollama: SystemCheckItem
+  ipfs: SystemCheckItem
+  nginx: SystemCheckItem
+}

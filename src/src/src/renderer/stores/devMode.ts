@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type DevTab = 'devtools' | 'workers' | 'sql' | 'ipc' | 'storybook'
+export type DevTab = 'devtools' | 'workers' | 'sql' | 'ipc' | 'storybook' | 'system'
 
 export interface IpcEvent {
   id: number
