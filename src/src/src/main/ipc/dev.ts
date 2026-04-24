@@ -1,6 +1,5 @@
 import { ipcMain, BrowserWindow, app, shell } from 'electron'
-import { spawn } from 'node:child_process'
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { statSync, existsSync, readdirSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { IpcChannel } from '@shared/ipc-channels'
@@ -14,6 +13,57 @@ import type {
 } from '@shared/types'
 import { getLocAdmDb } from '../db/connection'
 import { resolveWorkersDir } from '../workers/config'
+
+// Routes the storybook captures. Matches the CLI script at scripts/storybook.ts
+// but uses current app route names (e.g. /topic-map, not /knowledge-map).
+const STORYBOOK_ROUTES = [
+  '/dashboard',
+  '/folders',
+  '/topics',
+  '/insights',
+  '/topic-map',
+  '/community',
+  '/filters',
+  '/privacy',
+  '/llm',
+  '/settings'
+] as const
+
+const SCREENSHOT_WIDTH = 1920
+const SCREENSHOT_HEIGHT = 1080
+const SCREENSHOT_SETTLE_MS = 1200
+
+/**
+ * Where storybook output lives for this environment.
+ *   Dev: <projectRoot>/storybook/
+ *   Packaged: <userData>/storybook/
+ */
+function storybookOutputDir(): string {
+  const root = projectRootDir()
+  if (root) return join(root, 'storybook')
+  return join(app.getPath('userData'), 'storybook')
+}
+
+function slugifyRoute(route: string): string {
+  return route.replace(/^\//, '').replace(/\//g, '-') || 'root'
+}
+
+function renderStorybookMarkdown(routes: readonly string[]): string {
+  const when = new Date().toISOString().replace('T', ' ').slice(0, 19)
+  const lines: string[] = [
+    '# ShortCut Studio — Storybook',
+    '',
+    `Regenerated ${when} from inside the running app (Electron capturePage).`,
+    '',
+    '## Routes captured',
+    ''
+  ]
+  for (const route of routes) {
+    const slug = slugifyRoute(route)
+    lines.push(`### ${route}`, '', `![${slug}](screenshots/${slug}.png)`, '')
+  }
+  return lines.join('\n')
+}
 
 const MAX_SQL_ROWS = 500
 const BANNED_SQL_KEYWORDS = [
@@ -169,44 +219,30 @@ export function registerDevHandlers(): void {
   )
 
   ipcMain.handle(IpcChannel.DevGetStorybookInfo, (): DevStorybookInfo => {
-    const root = projectRootDir()
-    if (!root) {
-      // Packaged build — no source tree, no storybook to report on.
-      return {
-        available: false,
-        mtime: null,
-        screenshotCount: 0,
-        unpackedExists: false,
-        unpackedPath: '',
-        storybookDir: ''
-      }
-    }
-    const storybookDir = join(root, 'storybook')
-    const screenshotsDir = join(storybookDir, 'screenshots')
-    const mdPath = join(storybookDir, 'STORYBOOK.md')
+    const dir = storybookOutputDir()
+    const mdPath = join(dir, 'STORYBOOK.md')
     let mtime: number | null = null
     try {
       if (existsSync(mdPath)) mtime = statSync(mdPath).mtimeMs
     } catch {
       mtime = null
     }
-    const unpackedPath = join(root, 'release-builds', 'win-unpacked', 'ShortCut Studio.exe')
     return {
+      // capturePage-based regeneration works everywhere now; no longer
+      // gated on having a source tree.
       available: true,
       mtime,
-      screenshotCount: countScreenshots(screenshotsDir),
-      unpackedExists: existsSync(unpackedPath),
-      unpackedPath,
-      storybookDir
+      screenshotCount: countScreenshots(join(dir, 'screenshots')),
+      unpackedExists: false,
+      unpackedPath: '',
+      storybookDir: dir
     }
   })
 
   ipcMain.handle(
     IpcChannel.DevListStorybookScreenshots,
     async (): Promise<DevStorybookScreenshot[]> => {
-      const root = projectRootDir()
-      if (!root) return []
-      const dir = join(root, 'storybook', 'screenshots')
+      const dir = join(storybookOutputDir(), 'screenshots')
       if (!existsSync(dir)) return []
       const files = readdirSync(dir)
         .filter((f) => /\.(png|jpg|jpeg|webp)$/i.test(f))
@@ -236,80 +272,107 @@ export function registerDevHandlers(): void {
   )
 
   ipcMain.handle(IpcChannel.DevOpenStorybookFolder, async () => {
-    const root = projectRootDir()
-    if (!root) {
-      // Packaged build: no source tree. Open the resources folder instead so
-      // the user sees a real Explorer window (not the app-chooser dialog that
-      // appears when shell.openPath is pointed at app.asar).
-      await shell.openPath(process.resourcesPath)
-      return
+    const dir = storybookOutputDir()
+    if (!existsSync(dir)) {
+      // Create it on demand so the button never silently does nothing —
+      // first-time users see an empty folder they can watch fill up.
+      await mkdir(dir, { recursive: true })
     }
-    const storybookDir = join(root, 'storybook')
-    if (existsSync(storybookDir)) {
-      await shell.openPath(storybookDir)
-    } else {
-      await shell.openPath(root)
-    }
+    await shell.openPath(dir)
   })
 
-  ipcMain.handle(IpcChannel.DevRunStorybook, async (): Promise<DevRunStorybookResult> => {
-    if (app.isPackaged) {
-      return {
-        ok: false,
-        exitCode: null,
-        error: 'storybook regeneration is only available in dev builds (no npm in packaged installer)'
-      }
-    }
-    const focused =
-      BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
-    const send = (payload: DevStorybookLog): void => {
-      focused?.webContents.send(IpcChannel.DevStorybookLog, payload)
-    }
-    const cwd = projectRootDir()
-    if (!cwd) {
-      return {
-        ok: false,
-        exitCode: null,
-        error: 'storybook regeneration requires a source tree (not available in packaged builds)'
-      }
-    }
-    send({
-      stream: 'system',
-      line: `$ npm run storybook  (cwd=${cwd})`,
-      ts: Date.now()
-    })
-    return await new Promise<DevRunStorybookResult>((resolveResult) => {
-      const child = spawn('npm', ['run', 'storybook'], {
-        cwd,
-        shell: true,
-        windowsHide: true
-      })
-      child.stdout?.on('data', (chunk: Buffer) => {
-        for (const line of chunk.toString().split(/\r?\n/)) {
-          if (line.trim()) send({ stream: 'stdout', line, ts: Date.now() })
+  ipcMain.handle(
+    IpcChannel.DevCaptureStorybook,
+    async (): Promise<DevRunStorybookResult> => {
+      const source =
+        BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+      if (!source) {
+        return {
+          ok: false,
+          exitCode: null,
+          error: 'no source window to capture from'
         }
-      })
-      child.stderr?.on('data', (chunk: Buffer) => {
-        for (const line of chunk.toString().split(/\r?\n/)) {
-          if (line.trim()) send({ stream: 'stderr', line, ts: Date.now() })
-        }
-      })
-      child.on('error', (err) => {
-        send({
-          stream: 'system',
-          line: `[error] ${err.message}`,
+      }
+
+      const send = (line: string, stream: DevStorybookLog['stream'] = 'system'): void => {
+        source.webContents.send(IpcChannel.DevStorybookLog, {
+          stream,
+          line,
           ts: Date.now()
         })
-        resolveResult({ ok: false, exitCode: null, error: err.message })
+      }
+
+      // Derive base URL from the live source window — works for both dev
+      // (http://localhost:5173/) and packaged (file:///.../index.html).
+      const sourceUrl = source.webContents.getURL()
+      const baseUrl = sourceUrl.split('#')[0].replace(/\?.*$/, '')
+
+      const outDir = storybookOutputDir()
+      const shotsDir = join(outDir, 'screenshots')
+      await mkdir(shotsDir, { recursive: true })
+
+      send(`output: ${outDir}`)
+      send(`base URL: ${baseUrl}`)
+
+      // Hidden window mirrors the main window's webPreferences so the
+      // renderer boots normally (preload wired, context isolation on).
+      const captureWindow = new BrowserWindow({
+        show: false,
+        width: SCREENSHOT_WIDTH,
+        height: SCREENSHOT_HEIGHT,
+        webPreferences: {
+          preload: join(__dirname, '../preload/index.js'),
+          contextIsolation: true,
+          nodeIntegration: false,
+          sandbox: false,
+          backgroundThrottling: false
+        }
       })
-      child.on('exit', (code) => {
-        send({
-          stream: 'system',
-          line: `[exit] code=${code}`,
-          ts: Date.now()
-        })
-        resolveResult({ ok: code === 0, exitCode: code })
-      })
-    })
-  })
+      // Windows compositors sometimes skip rendering show:false windows.
+      // Position way off-screen and show() so frames actually render.
+      captureWindow.setPosition(-20000, -20000)
+      captureWindow.show()
+
+      let errorCount = 0
+      try {
+        for (const route of STORYBOOK_ROUTES) {
+          try {
+            const url = `${baseUrl}?screenshot=1#${route}`
+            send(`capturing ${route} …`)
+            await captureWindow.loadURL(url)
+            await new Promise<void>((r) => setTimeout(r, SCREENSHOT_SETTLE_MS))
+            const img = await captureWindow.webContents.capturePage()
+            const png = img.toPNG()
+            const outPath = join(shotsDir, `${slugifyRoute(route)}.png`)
+            await writeFile(outPath, png)
+            send(`  wrote ${png.byteLength.toLocaleString()} bytes`)
+          } catch (err) {
+            errorCount += 1
+            const msg = err instanceof Error ? err.message : String(err)
+            send(`  error on ${route}: ${msg}`, 'stderr')
+          }
+        }
+        const mdPath = join(outDir, 'STORYBOOK.md')
+        await writeFile(mdPath, renderStorybookMarkdown(STORYBOOK_ROUTES))
+        send(`wrote ${mdPath}`)
+
+        if (errorCount > 0) {
+          send(`done with ${errorCount} error(s)`, 'stderr')
+          return {
+            ok: false,
+            exitCode: errorCount,
+            error: `${errorCount} route(s) failed`
+          }
+        }
+        send('done')
+        return { ok: true, exitCode: 0 }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        send(`fatal: ${msg}`, 'stderr')
+        return { ok: false, exitCode: null, error: msg }
+      } finally {
+        captureWindow.destroy()
+      }
+    }
+  )
 }

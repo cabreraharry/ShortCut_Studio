@@ -161,7 +161,7 @@ export interface ElectronAPI {
     sqlSelect: (sql: string) => Promise<DevSqlResult>
     getStorybookInfo: () => Promise<DevStorybookInfo>
     listStorybookScreenshots: () => Promise<DevStorybookScreenshot[]>
-    runStorybook: () => Promise<DevRunStorybookResult>
+    captureStorybook: () => Promise<DevRunStorybookResult>
     openStorybookFolder: () => Promise<void>
     onStorybookLog: (
       cb: (p: import('./types').DevStorybookLog) => void

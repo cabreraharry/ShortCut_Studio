@@ -80,10 +80,17 @@ export function WelcomeOnLaunchDialog(): JSX.Element | null {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['settings'] })
   })
 
+  // Suppress when the storybook capture flow loads routes with ?screenshot=1 —
+  // otherwise the splash would overlay every captured screenshot.
+  const isScreenshotMode =
+    typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).has('screenshot')
+
   const shouldRender =
     !!settings?.welcomeOnStartup &&
     !dismissed &&
-    location.pathname !== '/setup'
+    location.pathname !== '/setup' &&
+    !isScreenshotMode
 
   // Keyboard handler + hint-reveal timer. No auto-dismiss — user reads at
   // their own pace and dismisses with click / Enter / Space / Esc.

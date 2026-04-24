@@ -104,7 +104,7 @@ export const IpcChannel = {
   DevGetPaths: 'dev:get-paths',
   DevSqlSelect: 'dev:sql-select',
   DevGetStorybookInfo: 'dev:get-storybook-info',
-  DevRunStorybook: 'dev:run-storybook',
+  DevCaptureStorybook: 'dev:capture-storybook',
   DevOpenStorybookFolder: 'dev:open-storybook-folder',
   DevStorybookLog: 'dev:storybook-log',
   DevListStorybookScreenshots: 'dev:list-storybook-screenshots',

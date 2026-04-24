@@ -44,27 +44,15 @@ export function StorybookTab(): JSX.Element {
     setLogs([])
     setRunning(true)
     try {
-      await api.dev.runStorybook()
+      await api.dev.captureStorybook()
       await refresh()
     } finally {
       setRunning(false)
     }
   }
 
-  const hasUnpacked = info?.unpackedExists ?? false
-  const available = info?.available ?? true
-
   return (
     <div className="space-y-4">
-      {!available && (
-        <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-[11px] text-muted-foreground">
-          Storybook regeneration is dev-only — it's only available when running
-          from the source tree (<span className="font-mono">npm run dev</span>).
-          Open folder will open the app's <span className="font-mono">resources/</span>{' '}
-          folder instead.
-        </div>
-      )}
-
       <section className="rounded-md border border-border/60 bg-muted/20 p-3 text-xs">
         <div className="flex items-center justify-between">
           <div className="font-semibold">Last run</div>
@@ -78,44 +66,30 @@ export function StorybookTab(): JSX.Element {
             value={info?.mtime ? new Date(info.mtime).toLocaleString() : '(never)'}
           />
           <KV label="Screenshots" value={info ? String(info.screenshotCount) : '—'} />
-          {available && (
-            <KV
-              label="Packaged build"
-              value={hasUnpacked ? 'found ✓' : 'missing — run npm run build:win first'}
-              tone={hasUnpacked ? 'ok' : 'warn'}
-            />
-          )}
+          <KV
+            label="Output folder"
+            value={info?.storybookDir || '—'}
+            mono
+          />
         </div>
       </section>
 
-      {available && (
-        <section className="space-y-2">
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-[11px] text-amber-900 dark:text-amber-300">
-            Regenerate spawns <span className="font-mono">npm run storybook</span>, which
-            launches a second Electron instance against{' '}
-            <span className="font-mono">release-builds/win-unpacked</span>. Make sure{' '}
-            <span className="font-mono">npm run build</span> has run recently — this
-            running instance is unaffected.
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={run} disabled={running}>
-              <PlayCircle className="h-3 w-3" />
-              {running ? 'Running…' : 'Regenerate'}
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => api.dev.openStorybookFolder()}>
-              <FolderOpen className="h-3 w-3" /> Open folder
-            </Button>
-          </div>
-        </section>
-      )}
-
-      {!available && (
+      <section className="space-y-2">
+        <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-[11px] text-muted-foreground">
+          Regenerate briefly opens a hidden copy of each page and captures a
+          screenshot using the app's own Chromium. No external tools needed —
+          works in dev and packaged installs alike.
+        </div>
         <div className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={run} disabled={running}>
+            <PlayCircle className="h-3 w-3" />
+            {running ? 'Capturing…' : 'Regenerate'}
+          </Button>
           <Button size="sm" variant="outline" onClick={() => api.dev.openStorybookFolder()}>
-            <FolderOpen className="h-3 w-3" /> Open resources folder
+            <FolderOpen className="h-3 w-3" /> Open folder
           </Button>
         </div>
-      )}
+      </section>
 
       {screenshots.length > 0 && (
         <section>
@@ -211,18 +185,21 @@ export function StorybookTab(): JSX.Element {
 function KV({
   label,
   value,
-  tone
+  tone,
+  mono
 }: {
   label: string
   value: string
   tone?: 'ok' | 'warn'
+  mono?: boolean
 }): JSX.Element {
   return (
     <div className="flex gap-3">
       <span className="w-32 shrink-0 text-muted-foreground">{label}</span>
       <span
         className={cn(
-          'font-mono',
+          mono !== false && 'font-mono',
+          mono && 'break-all',
           tone === 'ok' && 'text-emerald-500',
           tone === 'warn' && 'text-amber-500'
         )}

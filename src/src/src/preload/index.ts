@@ -141,7 +141,7 @@ const api: ElectronAPI = {
     getStorybookInfo: () => ipcRenderer.invoke(IpcChannel.DevGetStorybookInfo),
     listStorybookScreenshots: () =>
       ipcRenderer.invoke(IpcChannel.DevListStorybookScreenshots),
-    runStorybook: () => ipcRenderer.invoke(IpcChannel.DevRunStorybook),
+    captureStorybook: () => ipcRenderer.invoke(IpcChannel.DevCaptureStorybook),
     openStorybookFolder: () =>
       ipcRenderer.invoke(IpcChannel.DevOpenStorybookFolder),
     onStorybookLog: (cb) => {
