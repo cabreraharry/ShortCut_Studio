@@ -421,3 +421,41 @@ export interface SystemCheckResult {
   ipfs: SystemCheckItem
   nginx: SystemCheckItem
 }
+
+// ---------- Network & DB monitoring (Consumer Peer dashboard) ----------
+
+export interface AgentHubStatus {
+  connected: boolean
+  lastSyncMs: number | null         // ms since epoch of last successful poll
+  peerId: string                    // CP_SIS_DB.PeerID equivalent
+  authExpiresMs: number | null      // ms since epoch when auth expires
+  hubServerId: string | null        // assigned AH_ServerID
+}
+
+export interface PendingRequests {
+  cbr: number                       // ContentBuildRequest
+  csct: number                      // ContentSelfCheckTrigger
+  cdreq: number                     // ContentDataRequest
+  avgAgeMs: number                  // average age of pending requests
+  throughputPerSec: number          // recent successful responses / second
+}
+
+export interface DbFileInfo {
+  name: string                      // friendly name e.g. 'loc_adm.db'
+  path: string                      // absolute path on disk
+  sizeBytes: number | null          // null if file missing (e.g. mode-specific DBs not present yet)
+  reservedForV2?: boolean           // true for placeholder rows like Hash_Tracking_DB
+}
+
+export interface GrowthPoint {
+  ts: number                        // ms since epoch
+  totalRows: number                 // synthetic row count across local DBs
+}
+
+export interface NetworkSummary {
+  agentHub: AgentHubStatus
+  pending: PendingRequests
+  dbFiles: DbFileInfo[]
+  growth: GrowthPoint[]             // small series for the sparkline
+  growthPctChange: number           // rounded % change over the series
+}

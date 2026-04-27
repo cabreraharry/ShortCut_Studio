@@ -1,6 +1,7 @@
 import type {
   IpfsStatus,
   Job,
+  NetworkSummary,
   ProgressHistoryPoint,
   ProgressSummary,
   TimeRange,
@@ -31,6 +32,8 @@ export interface IExecEngineClient {
   renameTopic(from: string, to: string): Promise<void>
   mergeTopic(from: string, into: string): Promise<void>
   bumpGenerateTicks(): void
+
+  getNetworkSummary(): Promise<NetworkSummary>
 }
 
 let client: IExecEngineClient | null = null

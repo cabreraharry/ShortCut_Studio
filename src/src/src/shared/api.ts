@@ -12,6 +12,7 @@ import type {
   DevSqlResult,
   DevStorybookInfo,
   DevStorybookScreenshot,
+  NetworkSummary,
   SystemCheckResult,
   DriveInfo,
   FileTypeFilter,
@@ -168,6 +169,9 @@ export interface ElectronAPI {
     ) => () => void
     onToggle: (cb: () => void) => () => void
     systemCheck: () => Promise<SystemCheckResult>
+  }
+  network: {
+    summary: () => Promise<NetworkSummary>
   }
 }
 

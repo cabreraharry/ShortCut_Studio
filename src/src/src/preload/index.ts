@@ -158,6 +158,9 @@ const api: ElectronAPI = {
       return () => ipcRenderer.removeListener(IpcChannel.DevToggle, listener)
     },
     systemCheck: () => ipcRenderer.invoke(IpcChannel.DevSystemCheck)
+  },
+  network: {
+    summary: () => ipcRenderer.invoke(IpcChannel.NetworkSummary)
   }
 }
 

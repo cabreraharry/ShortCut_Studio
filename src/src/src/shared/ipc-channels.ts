@@ -108,7 +108,10 @@ export const IpcChannel = {
   DevOpenStorybookFolder: 'dev:open-storybook-folder',
   DevStorybookLog: 'dev:storybook-log',
   DevListStorybookScreenshots: 'dev:list-storybook-screenshots',
-  DevSystemCheck: 'dev:system-check'
+  DevSystemCheck: 'dev:system-check',
+
+  // Network / DB monitoring on Dashboard
+  NetworkSummary: 'network:summary'
 } as const
 
 export type IpcChannelName = (typeof IpcChannel)[keyof typeof IpcChannel]

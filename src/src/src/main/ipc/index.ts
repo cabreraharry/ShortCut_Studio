@@ -18,6 +18,7 @@ import { registerFilterHandlers } from './filters'
 import { registerKnowledgeMapHandlers } from './knowledgeMap'
 import { registerDevHandlers } from './dev'
 import { registerSystemCheckHandlers } from './system-check'
+import { registerNetworkHandlers } from './network'
 
 export function registerIpcHandlers(): void {
   registerAppHandlers()
@@ -40,4 +41,5 @@ export function registerIpcHandlers(): void {
   registerKnowledgeMapHandlers()
   registerDevHandlers()
   registerSystemCheckHandlers()
+  registerNetworkHandlers()
 }

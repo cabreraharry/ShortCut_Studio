@@ -25,6 +25,7 @@ import { DedupCard } from './DedupCard'
 import { HoursSavedCard } from './HoursSavedCard'
 import { DashboardHeroBanner } from '@/components/visual/HeroBanner'
 import { DashboardWelcomeHero } from './DashboardWelcomeHero'
+import { NetworkCard } from './NetworkCard'
 import { ColorfulStat } from '@/components/visual/ColorfulStat'
 import { ActivityTicker } from '@/components/visual/ActivityTicker'
 import { useBurst } from '@/components/visual/Burst'
@@ -244,6 +245,8 @@ export default function DashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      <NetworkCard />
     </div>
   )
 }
