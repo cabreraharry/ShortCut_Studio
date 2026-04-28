@@ -30,6 +30,8 @@ export const IpcChannel = {
   LlmAddModel: 'llm:add-model',
   LlmSetDefaultModel: 'llm:set-default-model',
   LlmTestConnection: 'llm:test-connection',
+  LlmDiscoverModels: 'llm:discover-models',
+  LlmComplete: 'llm:complete',
 
   // Admin settings
   SettingsGet: 'settings:get',
@@ -39,6 +41,7 @@ export const IpcChannel = {
   ProgressSummary: 'progress:summary',
   ProgressJobs: 'progress:jobs',
   ProgressHistory: 'progress:history',
+  ProgressByStage: 'progress:by-stage',
 
   // Topics
   TopicsList: 'topics:list',
@@ -69,6 +72,9 @@ export const IpcChannel = {
   DiagnosticsWorkers: 'diagnostics:workers',
   DiagnosticsRestartWorker: 'diagnostics:restart-worker',
   DiagnosticsTailLog: 'diagnostics:tail-log',
+  DiagnosticsListErrors: 'diagnostics:list-errors',
+  DiagnosticsClearErrors: 'diagnostics:clear-errors',
+  DiagnosticsRecordRendererError: 'diagnostics:record-renderer-error',
 
   // System (OS shortcuts + filesystem helpers)
   SystemOpenFile: 'system:open-file',
@@ -111,7 +117,14 @@ export const IpcChannel = {
   DevSystemCheck: 'dev:system-check',
 
   // Network / DB monitoring on Dashboard
-  NetworkSummary: 'network:summary'
+  NetworkSummary: 'network:summary',
+
+  // ExecEngine Consumer Peer connection
+  ExecEngineGetStatus: 'execengine:get-status',
+  ExecEngineSetConfig: 'execengine:set-config',
+  ExecEngineSignIn: 'execengine:sign-in',
+  ExecEngineSignOut: 'execengine:sign-out',
+  ExecEngineHealthCheck: 'execengine:health-check'
 } as const
 
 export type IpcChannelName = (typeof IpcChannel)[keyof typeof IpcChannel]

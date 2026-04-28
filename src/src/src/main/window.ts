@@ -1,5 +1,6 @@
 import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'node:path'
+import { resolveAppIconPath } from './icon'
 
 let isQuitting = false
 
@@ -15,7 +16,7 @@ export function createMainWindow(): BrowserWindow {
     minHeight: 700,
     show: false,
     autoHideMenuBar: true,
-    icon: join(__dirname, '../../resources/icon.ico'),
+    icon: resolveAppIconPath(),
     backgroundColor: '#0b0f19',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

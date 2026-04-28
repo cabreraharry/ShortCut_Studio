@@ -1,7 +1,13 @@
 import { ipcMain } from 'electron'
 import { IpcChannel } from '@shared/ipc-channels'
 import { getExecEngine } from '../execengine/client'
-import type { Job, ProgressHistoryPoint, ProgressSummary, TimeRange } from '@shared/types'
+import type {
+  Job,
+  ProgressByStage,
+  ProgressHistoryPoint,
+  ProgressSummary,
+  TimeRange
+} from '@shared/types'
 
 export function registerProgressHandlers(): void {
   ipcMain.handle(
@@ -19,6 +25,13 @@ export function registerProgressHandlers(): void {
     IpcChannel.ProgressHistory,
     async (_evt, range: TimeRange): Promise<ProgressHistoryPoint[]> => {
       return getExecEngine().getProgressHistory(range)
+    }
+  )
+
+  ipcMain.handle(
+    IpcChannel.ProgressByStage,
+    async (_evt, range: TimeRange): Promise<ProgressByStage> => {
+      return getExecEngine().getProgressByStage(range)
     }
   )
 }

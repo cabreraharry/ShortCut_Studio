@@ -1,56 +1,45 @@
-# ShortCut Studio — UX Storybook
+# ShortCut Studio — Storybook
 
-Generated 2026-04-23 from the packaged build at `release-builds/win-unpacked/ShortCut Studio.exe`.
-Each section is one page of the app.
+Regenerated 2026-04-24 20:16:31 from inside the running app (Electron capturePage).
 
-## How to use this for AI feedback
+## Routes captured
 
-Paste the section for one page into Claude / GPT / Gemini with this prompt:
+### /dashboard
 
-> You are a senior product designer. Review the screenshot below from
-> ShortCut Studio (an Electron desktop app for researchers). Give me 3-5
-> concrete improvements: layout, visual hierarchy, copy, affordance gaps,
-> or anything that looks broken. Be specific — name elements, suggest
-> pixel-level or wording changes. Skip generic praise.
+![dashboard](screenshots/dashboard.png)
 
----
+### /folders
 
-## Dashboard
+![folders](screenshots/folders.png)
 
-![Dashboard](screenshots/dashboard.png)
+### /topics
 
-## Folders
+![topics](screenshots/topics.png)
 
-![Folders](screenshots/folders.png)
+### /insights
 
-## Topics
+![insights](screenshots/insights.png)
 
-![Topics](screenshots/topics.png)
+### /topic-map
 
-## Insights
+![topic-map](screenshots/topic-map.png)
 
-![Insights](screenshots/insights.png)
+### /community
 
-## Knowledge Map
+![community](screenshots/community.png)
 
-![Knowledge Map](screenshots/knowledge-map.png)
+### /filters
 
-## Community
+![filters](screenshots/filters.png)
 
-![Community](screenshots/community.png)
+### /privacy
 
-## Filters
+![privacy](screenshots/privacy.png)
 
-![Filters](screenshots/filters.png)
+### /llm
 
-## Privacy
+![llm](screenshots/llm.png)
 
-![Privacy](screenshots/privacy.png)
+### /settings
 
-## LLMs
-
-![LLMs](screenshots/llm.png)
-
-## Settings
-
-![Settings](screenshots/settings.png)
+![settings](screenshots/settings.png)

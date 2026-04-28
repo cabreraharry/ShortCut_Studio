@@ -27,6 +27,7 @@ import { useBurst } from '@/components/visual/Burst'
 import { SkeletonRows, SkeletonChip } from '@/components/ui/skeleton'
 import type { SuperCategory, Topic, TopicReviewItem } from '@shared/types'
 import { TopicDistributionChart } from './TopicDistributionChart'
+import { WithHint } from '@/components/ui/help-hint'
 
 function errMsg(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback
@@ -111,6 +112,7 @@ function PipelineBar({
           label="Pending review"
           count={reviewCount}
           tone={reviewCount > 0 ? 'amber' : 'muted'}
+          hint="AI-generated topic suggestions waiting for your call: Approve, Reject, Rename, or Merge each one. Approved suggestions move to the Topics list."
         />
         <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground/60" />
         <PipelineStep
@@ -118,6 +120,7 @@ function PipelineBar({
           label="Approved topics"
           count={topicCount}
           tone={topicCount > 0 ? 'primary' : 'muted'}
+          hint="Topics you've approved. Each can be dragged into a Super-category to group related topics together."
         />
         <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground/60" />
         <PipelineStep
@@ -125,10 +128,15 @@ function PipelineBar({
           label="Super-categories"
           count={superCategoryCount}
           tone={superCategoryCount > 0 ? 'emerald' : 'muted'}
+          hint="Top-level groupings you create (e.g. 'Machine Learning', 'Personal'). Topics live inside super-categories on the Knowledge Map."
         />
         <div className="ml-auto flex items-center gap-2">
-          <AutoOrganizeButton />
-          <TriggerGenerationButton />
+          <WithHint label="One-shot pipeline: AI generates topics from your scanned files, auto-assigns each to a super-category, and skips the review queue. Faster but you don't get to vet the suggestions.">
+            <span className="inline-flex"><AutoOrganizeButton /></span>
+          </WithHint>
+          <WithHint label="Asks the AI to suggest topics from files that don't have one yet. Suggestions land in the Pending review queue so you can Approve / Reject / Rename / Merge each one before they're applied. Takes ~30 s.">
+            <span className="inline-flex"><TriggerGenerationButton /></span>
+          </WithHint>
         </div>
       </CardContent>
     </Card>
@@ -139,12 +147,14 @@ function PipelineStep({
   icon,
   label,
   count,
-  tone
+  tone,
+  hint
 }: {
   icon: React.ReactNode
   label: string
   count: number
   tone: 'amber' | 'primary' | 'emerald' | 'muted'
+  hint?: string
 }) {
   const toneClass = {
     amber: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30',
@@ -152,13 +162,15 @@ function PipelineStep({
     emerald: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30',
     muted: 'bg-muted/40 text-muted-foreground border-border'
   }[tone]
-  return (
+  const node = (
     <div className={cn('flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs', toneClass)}>
       {icon}
       <span className="font-medium">{label}</span>
       <span className="font-mono tabular-nums font-semibold">{count}</span>
     </div>
   )
+  if (!hint) return node
+  return <WithHint label={hint}>{node}</WithHint>
 }
 
 function EmptyHero() {

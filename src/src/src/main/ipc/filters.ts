@@ -14,7 +14,7 @@ import { getLocAdmDb } from '../db/connection'
 import { applyRules } from '../filters/ruleEngine'
 import { buildClassifierPrompt, parseClassifierResponse } from '../filters/prompts'
 import { startClassifyJob } from '../filters/classifier'
-import { getAllDocumentInsights } from '../mock/insights'
+import { getAllDocumentInsightsReal } from '../db/scl-folder'
 
 interface PresetDbRow {
   id: number
@@ -54,7 +54,7 @@ export function registerFilterHandlers(): void {
   ipcMain.handle(
     IpcChannel.FiltersPreview,
     (_evt, ruleSet: FilterRuleSet): FilterPreviewResult => {
-      const files = getAllDocumentInsights(ruleSet.folder)
+      const files = getAllDocumentInsightsReal(ruleSet.folder)
       const labels = loadLabels()
       return applyRules(ruleSet, files, labels)
     }

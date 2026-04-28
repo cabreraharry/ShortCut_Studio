@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { PrivacyShield } from '@/components/visual/PrivacyShield'
+import { HelpHint } from '@/components/ui/help-hint'
 import type { DbMode } from '@shared/types'
 
 export default function PrivacyPage() {
@@ -63,6 +64,10 @@ export default function PrivacyPage() {
           <CardTitle className="flex items-center gap-2">
             <ShieldCheck className="h-4 w-4" />
             System defaults
+            <HelpHint
+              size="xs"
+              label="Built-in privacy terms (personal, private, confidential, draft, etc.). They're locked — you can't edit them, but they apply alongside any terms you add yourself."
+            />
           </CardTitle>
           <CardDescription>
             Included out of the box. Add your own below to tailor to your workflow.
@@ -82,7 +87,13 @@ export default function PrivacyPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Your terms</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Your terms
+            <HelpHint
+              size="xs"
+              label="Custom terms specific to your workflow (e.g. client names, project codenames). Case-insensitive substring match against the file path. Adding or removing a term only affects future scans — files already routed don't get re-categorized retroactively."
+            />
+          </CardTitle>
           <CardDescription>
             Terms you've added. Changes apply on the next scan pass; files already classified stay put.
           </CardDescription>

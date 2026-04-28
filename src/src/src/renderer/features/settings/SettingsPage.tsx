@@ -15,6 +15,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { HelpHint } from '@/components/ui/help-hint'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -30,6 +31,8 @@ import { api } from '@/lib/api'
 import { toast } from '@/hooks/use-toast'
 import { SHOW_DIAGNOSTICS } from '@/lib/app-info'
 import type { AppSettings, WorkerStatus } from '@shared/types'
+import { ExecEngineCard } from './ExecEngineCard'
+import { ErrorsCard } from './ErrorsCard'
 
 export default function SettingsPage() {
   return (
@@ -43,6 +46,8 @@ export default function SettingsPage() {
       </div>
       <PathsCard />
       <AdminCard />
+      <ExecEngineCard />
+      <ErrorsCard />
       {SHOW_DIAGNOSTICS && <DiagnosticsCard />}
       <DeveloperTip />
     </div>
@@ -230,18 +235,21 @@ function AdminCard() {
           description="ExecEngine queue bus (default 44999)"
           value={draft.localhostPort?.toString() ?? ''}
           onChange={(v) => setDraft({ ...draft, localhostPort: Number(v) || 0 })}
+          hint="TCP port the ExecEngine queue server listens on. 44999 is the default; only change it if another app on this PC has claimed that port. App restart required."
         />
         <Field
           label="Topic threshold"
           description="Minimum files before a topic is auto-created"
           value={draft.numTopicThreshold?.toString() ?? ''}
           onChange={(v) => setDraft({ ...draft, numTopicThreshold: Number(v) || 0 })}
+          hint="The AI won't propose a brand-new topic until at least this many files cluster around it. Higher = fewer noise topics. Default 10 is a good balance for personal libraries."
         />
         <Field
           label="CPU threshold (%)"
           description="Background work pauses when CPU load is above this"
           value={draft.cpuPerfThreshold?.toString() ?? ''}
           onChange={(v) => setDraft({ ...draft, cpuPerfThreshold: Number(v) || 0 })}
+          hint="If overall system CPU load exceeds this percent, the supervisor pauses heavy workers (gemini_processor, scanner) so the rest of your machine stays responsive. Lower = more polite, slower processing."
         />
         <div className="flex justify-end">
           <Button
@@ -261,17 +269,22 @@ function Field({
   label,
   description,
   value,
-  onChange
+  onChange,
+  hint
 }: {
   label: string
   description: string
   value: string
   onChange: (v: string) => void
+  hint?: string
 }) {
   return (
     <div className="grid gap-1 md:grid-cols-[240px_1fr] md:items-center">
       <div>
-        <div className="text-sm font-medium">{label}</div>
+        <div className="flex items-center gap-1 text-sm font-medium">
+          {label}
+          {hint && <HelpHint size="xs" label={hint} />}
+        </div>
         <div className="text-xs text-muted-foreground">{description}</div>
       </div>
       <Input value={value} onChange={(e) => onChange(e.target.value)} />
@@ -305,6 +318,10 @@ function DiagnosticsCard() {
           <CardTitle className="flex items-center gap-2">
             <HeartPulse className="h-4 w-4" />
             Diagnostics
+            <HelpHint
+              size="sm"
+              label="Live status of the SCL_Demo background workers (root_watchdog, topic_watchdog, gemini_processor). Each row shows the worker's PID, status, last successful health check, and a Restart button. Tail logs to investigate crashes."
+            />
           </CardTitle>
           <CardDescription>
             Background worker status. Tuck this panel away unless something looks wrong.

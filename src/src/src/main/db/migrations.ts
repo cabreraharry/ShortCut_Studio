@@ -112,6 +112,9 @@ export function runMigrations(): void {
       reason TEXT
     );
   `)
+  // AppErrors table lives in a separate errors.db — see db/errorsConnection.ts.
+  // Kept out of loc_adm.db so a future "send debug bundle to support" flow can
+  // ship error logs without leaking API keys / paths from this DB.
 
   // Seed admin settings row if missing
   const adminRow = db.prepare('SELECT RecID FROM AdminData WHERE RecID = 1').get()
@@ -170,6 +173,57 @@ export function runMigrations(): void {
   }
   try {
     db.prepare('ALTER TABLE AdminData ADD COLUMN WelcomeOnStartup INTEGER NOT NULL DEFAULT 1').run()
+  } catch {
+    // column already exists
+  }
+  // LLM_Usage: extend with per-call metadata. All nullable so existing rows
+  // (none yet — table is unused at the time of migration) stay valid.
+  try {
+    db.prepare('ALTER TABLE LLM_Usage ADD COLUMN modelId INTEGER').run()
+  } catch {
+    // column already exists
+  }
+  try {
+    db.prepare('ALTER TABLE LLM_Usage ADD COLUMN feature TEXT').run()
+  } catch {
+    // column already exists
+  }
+  try {
+    db.prepare('ALTER TABLE LLM_Usage ADD COLUMN latencyMs INTEGER').run()
+  } catch {
+    // column already exists
+  }
+  // ExecEngine connection: SIS host + port (where the auth API lives), plus
+  // the most-recently-issued session token so we can stay logged in across
+  // app restarts (24-hour validity per SIS docs). Username/password are NEVER
+  // persisted — the user re-enters them via a dialog when the token expires.
+  try {
+    db.prepare("ALTER TABLE AdminData ADD COLUMN ExecEngineSisHost TEXT NOT NULL DEFAULT 'localhost'").run()
+  } catch {
+    // column already exists
+  }
+  try {
+    db.prepare('ALTER TABLE AdminData ADD COLUMN ExecEngineSisPort INTEGER NOT NULL DEFAULT 44450').run()
+  } catch {
+    // column already exists
+  }
+  try {
+    db.prepare('ALTER TABLE AdminData ADD COLUMN ExecEngineSessionToken TEXT').run()
+  } catch {
+    // column already exists
+  }
+  try {
+    db.prepare('ALTER TABLE AdminData ADD COLUMN ExecEngineCpId TEXT').run()
+  } catch {
+    // column already exists
+  }
+  try {
+    db.prepare('ALTER TABLE AdminData ADD COLUMN ExecEngineMasterId TEXT').run()
+  } catch {
+    // column already exists
+  }
+  try {
+    db.prepare('ALTER TABLE AdminData ADD COLUMN ExecEngineTokenExpiresAt INTEGER').run()
   } catch {
     // column already exists
   }

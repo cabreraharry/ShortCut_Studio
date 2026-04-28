@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { net } from 'electron'
 import type { WorkerStatus } from '@shared/types'
+import { recordError } from '../diagnostics/errorStore'
 import {
   SUPERVISED_WORKERS,
   resolveWorkerExecutable,
@@ -91,6 +92,19 @@ function spawnWorker(handle: WorkerHandle): void {
     const crashed = code !== 0 && code !== null
     handle.status = crashed ? 'crashed' : 'stopped'
     pushLog(handle, `[supervisor] ${cfg.name} exited (code=${code})`)
+    if (crashed) {
+      recordError({
+        source: 'worker',
+        severity: 'error',
+        category: cfg.name,
+        message: `exited code=${code}`,
+        context: {
+          code,
+          restartCount: handle.restartCount,
+          lastLogs: handle.logBuffer.slice(-20)
+        }
+      })
+    }
     if (crashed && handle.restartCount < MAX_RESTART_ATTEMPTS) {
       const delay = Math.min(30_000, 2_000 * Math.pow(2, handle.restartCount))
       handle.restartCount += 1
@@ -98,6 +112,13 @@ function spawnWorker(handle: WorkerHandle): void {
       setTimeout(() => spawnWorker(handle), delay)
     } else if (crashed) {
       pushLog(handle, `[supervisor] giving up on ${cfg.name} after ${handle.restartCount} restarts`)
+      recordError({
+        source: 'worker',
+        severity: 'error',
+        category: cfg.name,
+        message: `gave up after ${handle.restartCount} restarts`,
+        context: { code, restartCount: handle.restartCount }
+      })
     }
   })
 }

@@ -2,7 +2,7 @@ import { dialog, ipcMain } from 'electron'
 import { existsSync, statSync } from 'node:fs'
 import { IpcChannel } from '@shared/ipc-channels'
 import { getLocAdmDb } from '../db/connection'
-import { getFolderHealth } from '../mock/insights'
+import { getFolderHealthReal } from '../db/scl-folder'
 import type { FolderRow } from '@shared/types'
 
 function assertFolder(path: string): void {
@@ -23,7 +23,7 @@ interface FolderDbRow {
 }
 
 function toFolderRow(r: FolderDbRow): FolderRow {
-  const health = getFolderHealth(r.ID)
+  const health = getFolderHealthReal(r.Path)
   return {
     id: r.ID,
     path: r.Path,
@@ -66,7 +66,7 @@ export function registerFolderHandlers(): void {
             include = hasParent?.hit ? 'N' : 'Y'
           }
           const info = insert.run(p, include)
-          const health = getFolderHealth(Number(info.lastInsertRowid))
+          const health = getFolderHealthReal(p)
           added.push({
             id: Number(info.lastInsertRowid),
             path: p,

@@ -1,7 +1,16 @@
-import { ipcMain, net } from 'electron'
+import { ipcMain } from 'electron'
 import { IpcChannel } from '@shared/ipc-channels'
 import { getLocAdmDb } from '../db/connection'
-import type { LlmModel, LlmProvider, LlmTestResult } from '@shared/types'
+import { AuthFailedError, discoverModels } from '../llm/modelDiscovery'
+import { complete } from '../llm/completion'
+import type {
+  LlmCompleteRequest,
+  LlmCompleteResult,
+  LlmDiscoverResult,
+  LlmModel,
+  LlmProvider,
+  LlmTestResult
+} from '@shared/types'
 
 interface ProviderDbRow {
   Provider_ID: number
@@ -98,6 +107,77 @@ export function registerLlmHandlers(): void {
   })
 
   ipcMain.handle(
+    IpcChannel.LlmDiscoverModels,
+    async (_evt, providerId: number): Promise<LlmDiscoverResult> => {
+      const db = getLocAdmDb()
+      const provider = db
+        .prepare('SELECT * FROM LLM_Provider WHERE Provider_ID = ?')
+        .get(providerId) as ProviderDbRow | undefined
+      if (!provider) return { ok: false, error: 'Provider not found' }
+      const start = Date.now()
+      try {
+        const result = await discoverModels({
+          providerName: provider.Provider_Name,
+          apiHost: provider.API_Host,
+          apiKey: provider.API_Key
+        })
+        const latencyMs = Date.now() - start
+        // Refuse to wipe the existing list if the discovery returned zero
+        // results — that's almost always a transient API/account quirk
+        // (e.g. OpenAI returning an empty data array for a fresh org), not a
+        // signal that the user should lose their previously curated models.
+        if (result.models.length === 0) {
+          return {
+            ok: false,
+            latencyMs,
+            error:
+              'Provider returned no models — leaving the existing list untouched. Try again or add models manually.'
+          }
+        }
+        // Replace the provider's Models rows transactionally. Preserve the
+        // existing default-model name if the user already chose one and the
+        // newly discovered list still contains it; otherwise fall back to the
+        // discoverer's suggested default (or first model).
+        const prevDefault = db
+          .prepare(
+            "SELECT ModelName FROM Models WHERE ProviderID = ? AND ProviderDefault = 'Y' LIMIT 1"
+          )
+          .get(providerId) as { ModelName: string } | undefined
+        const defaultName =
+          (prevDefault && result.models.includes(prevDefault.ModelName)
+            ? prevDefault.ModelName
+            : result.defaultModel) ?? result.models[0]
+        const insertOne = db.prepare(
+          'INSERT INTO Models (ProviderID, ModelName, ProviderDefault) VALUES (?, ?, ?)'
+        )
+        db.transaction(() => {
+          db.prepare('DELETE FROM Models WHERE ProviderID = ?').run(providerId)
+          for (const name of result.models) {
+            insertOne.run(providerId, name, name === defaultName ? 'Y' : 'N')
+          }
+        })()
+        return {
+          ok: true,
+          latencyMs,
+          count: result.models.length,
+          models: result.models,
+          fallback: result.fallback
+        }
+      } catch (err) {
+        const error =
+          err instanceof AuthFailedError
+            ? 'Auth failed — check the API key'
+            : err instanceof Error
+              ? err.message
+              : String(err)
+        return { ok: false, error, latencyMs: Date.now() - start }
+      }
+    }
+  )
+
+  // Test-connection is just discovery with the model list discarded. Auth
+  // validity == discovery success.
+  ipcMain.handle(
     IpcChannel.LlmTestConnection,
     async (_evt, providerId: number): Promise<LlmTestResult> => {
       const provider = getLocAdmDb()
@@ -106,27 +186,31 @@ export function registerLlmHandlers(): void {
       if (!provider) return { ok: false, error: 'Provider not found' }
       const start = Date.now()
       try {
-        // Minimal reachability check — depends on provider. For Ollama, GET /api/tags.
-        // For OpenAI/Claude/Gemini, just verify we can reach the host root with auth.
-        // This is a v1 placeholder; real test-calls land alongside the LLM feature build-out.
-        const host = provider.API_Host || ''
-        if (!host) return { ok: false, error: 'No API host configured' }
-        await new Promise<void>((resolve, reject) => {
-          const req = net.request({ method: 'GET', url: host })
-          req.on('response', (res) => {
-            res.on('data', () => {})
-            res.on('end', () => {
-              if (res.statusCode && res.statusCode < 500) resolve()
-              else reject(new Error(`HTTP ${res.statusCode}`))
-            })
-          })
-          req.on('error', reject)
-          req.end()
+        await discoverModels({
+          providerName: provider.Provider_Name,
+          apiHost: provider.API_Host,
+          apiKey: provider.API_Key
         })
         return { ok: true, latencyMs: Date.now() - start }
       } catch (err) {
-        return { ok: false, error: err instanceof Error ? err.message : String(err) }
+        const error =
+          err instanceof AuthFailedError
+            ? 'Auth failed — check the API key'
+            : err instanceof Error
+              ? err.message
+              : String(err)
+        return { ok: false, error, latencyMs: Date.now() - start }
       }
+    }
+  )
+
+  // Generic chat-completion entry point. Routes through the configured default
+  // provider (or an explicit override) and writes a row to LLM_Usage on success.
+  // Any feature in the app can call this via api.llm.complete(req).
+  ipcMain.handle(
+    IpcChannel.LlmComplete,
+    async (_evt, req: LlmCompleteRequest): Promise<LlmCompleteResult> => {
+      return complete(req)
     }
   )
 }

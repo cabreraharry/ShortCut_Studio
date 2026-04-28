@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { Network, Sparkles } from 'lucide-react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { HelpHint } from '@/components/ui/help-hint'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/visual/EmptyState'
 import { api } from '@/lib/api'
@@ -84,6 +85,20 @@ export default function KnowledgeMapPage(): JSX.Element {
         <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
           <Network className="h-6 w-6" />
           Topic Map
+          <HelpHint
+            size="sm"
+            label={
+              <>
+                <div className="font-semibold">A graph of YOU → Super-categories → Topics → sample Files.</div>
+                <ul className="mt-1 list-disc pl-4 text-muted-foreground">
+                  <li>Big circle in the middle = you. Surrounding rings = super-categories.</li>
+                  <li>Each super-category fans out into its topics; each topic shows up to 4 sample files.</li>
+                  <li>Click a node to see its details on the right. Use the arrows to step through every node.</li>
+                  <li>The search bar dims non-matching nodes; the super-category filter narrows the graph.</li>
+                </ul>
+              </>
+            }
+          />
         </h1>
         <p className="text-sm text-muted-foreground">
           Your library as a constellation. Click any node for details, or use the arrows to walk through every node.

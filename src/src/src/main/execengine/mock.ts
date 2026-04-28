@@ -2,11 +2,14 @@ import type {
   IExecEngineClient
 } from './client'
 import type {
+  ArtifactStage,
   IpfsStatus,
   Job,
   NetworkSummary,
+  ProgressByStage,
   ProgressHistoryPoint,
   ProgressSummary,
+  StageProgress,
   TimeRange,
   TopicDistribution,
   TopicReviewItem
@@ -27,20 +30,25 @@ interface RangeProfile {
   etaDays: number
   curve: CurveKind
   label: string
-  /** ±% jitter applied to cumulative counts so values don't feel canned. */
-  cumulativeNoise: number
+  /**
+   * Multiplier on the baseline cumulative count. Lets each range show a
+   * visibly distinct "All time" total in the demo so clicking 5h vs 5d
+   * actually moves the bottle. Strictly speaking all-time is range-invariant,
+   * but this is a demo and the original ±2% noise was imperceptible.
+   */
+  cumulativeScale: number
 }
 
 const RANGE_PROFILES: Record<TimeRange, RangeProfile> = {
-  '5h':  { hours: 5,    deltaLocal: 38,   deltaPeer: 124,  etaDays: 11,  curve: 'spike',     label: 'Last 5h',   cumulativeNoise: 0.012 },
-  '12h': { hours: 12,   deltaLocal: 88,   deltaPeer: 198,  etaDays: 10,  curve: 'climb',     label: 'Last 12h',  cumulativeNoise: 0.014 },
-  '24h': { hours: 24,   deltaLocal: 162,  deltaPeer: 287,  etaDays: 9,   curve: 'climb',     label: 'Last 24h',  cumulativeNoise: 0.016 },
-  '1d':  { hours: 24,   deltaLocal: 162,  deltaPeer: 287,  etaDays: 9,   curve: 'climb',     label: 'Last 24h',  cumulativeNoise: 0.016 },
-  '2d':  { hours: 48,   deltaLocal: 286,  deltaPeer: 451,  etaDays: 8,   curve: 'wave',      label: 'Last 2d',   cumulativeNoise: 0.018 },
-  '3d':  { hours: 72,   deltaLocal: 410,  deltaPeer: 612,  etaDays: 8,   curve: 'wave',      label: 'Last 3d',   cumulativeNoise: 0.020 },
-  '5d':  { hours: 120,  deltaLocal: 612,  deltaPeer: 904,  etaDays: 7,   curve: 'plateau',   label: 'Last 5d',   cumulativeNoise: 0.022 },
-  '10d': { hours: 240,  deltaLocal: 1080, deltaPeer: 1480, etaDays: 6,   curve: 'plateau',   label: 'Last 10d',  cumulativeNoise: 0.024 },
-  all:   { hours: 720,  deltaLocal: 2900, deltaPeer: 3120, etaDays: 5,   curve: 'plateau',   label: 'All time',  cumulativeNoise: 0.000 }
+  '5h':  { hours: 5,    deltaLocal: 38,   deltaPeer: 124,  etaDays: 14,  curve: 'spike',     label: 'Last 5h',   cumulativeScale: 0.58 },
+  '12h': { hours: 12,   deltaLocal: 88,   deltaPeer: 198,  etaDays: 12,  curve: 'climb',     label: 'Last 12h',  cumulativeScale: 0.72 },
+  '24h': { hours: 24,   deltaLocal: 162,  deltaPeer: 287,  etaDays: 11,  curve: 'climb',     label: 'Last 24h',  cumulativeScale: 0.85 },
+  '1d':  { hours: 24,   deltaLocal: 162,  deltaPeer: 287,  etaDays: 11,  curve: 'climb',     label: 'Last 24h',  cumulativeScale: 0.85 },
+  '2d':  { hours: 48,   deltaLocal: 286,  deltaPeer: 451,  etaDays: 9,   curve: 'wave',      label: 'Last 2d',   cumulativeScale: 1.02 },
+  '3d':  { hours: 72,   deltaLocal: 410,  deltaPeer: 612,  etaDays: 8,   curve: 'wave',      label: 'Last 3d',   cumulativeScale: 1.20 },
+  '5d':  { hours: 120,  deltaLocal: 612,  deltaPeer: 904,  etaDays: 6,   curve: 'plateau',   label: 'Last 5d',   cumulativeScale: 1.46 },
+  '10d': { hours: 240,  deltaLocal: 1080, deltaPeer: 1480, etaDays: 5,   curve: 'plateau',   label: 'Last 10d',  cumulativeScale: 1.78 },
+  all:   { hours: 720,  deltaLocal: 2900, deltaPeer: 3120, etaDays: 4,   curve: 'plateau',   label: 'All time',  cumulativeScale: 2.05 }
 }
 
 /** Maps t∈[0,1] to a "fraction of the period's delta accumulated by t". */
@@ -68,15 +76,6 @@ function curveValue(t: number, kind: CurveKind): number {
   }
 }
 
-/** Stable hash so per-range jitter is deterministic but distinct. */
-function rangeHash(range: TimeRange): number {
-  let h = 2166136261
-  for (let i = 0; i < range.length; i++) {
-    h = Math.imul(h ^ range.charCodeAt(i), 16777619)
-  }
-  return ((h >>> 0) % 1000) / 1000   // 0..1
-}
-
 /**
  * v1 stub. Returns deterministic synthetic data that varies over time so
  * the Progress Glass looks alive during development. Peer counts follow a
@@ -98,14 +97,13 @@ export class MockExecEngineClient implements IExecEngineClient {
     const profile = RANGE_PROFILES[range]
     const hrs = this.elapsedHours()
 
-    // Cumulative counts are "all time" — they shouldn't swing wildly with the
-    // selected range. But add deterministic per-range noise so the dashboard
-    // doesn't show identical numbers when the user clicks 5h vs 1d.
-    const noise = (rangeHash(range) - 0.5) * 2 * profile.cumulativeNoise
-    const baseLocal = 4_102 + hrs * 5
-    const basePeer = 318 + Math.sin(hrs / 6) * 40 + hrs * 1.5
-    const processedLocal = Math.floor(baseLocal * (1 + noise))
-    const processedPeer = Math.floor(basePeer * (1 + noise * 0.7))
+    // Each range gets its own cumulative scale so the dashboard shows visibly
+    // distinct totals when the user clicks 5h vs 1d vs 5d. See cumulativeScale
+    // on RangeProfile for the rationale.
+    const baseLocal = (4_102 + hrs * 5) * profile.cumulativeScale
+    const basePeer = (318 + Math.sin(hrs / 6) * 40 + hrs * 1.5) * profile.cumulativeScale
+    const processedLocal = Math.floor(baseLocal)
+    const processedPeer = Math.floor(basePeer)
     const remaining = Math.max(0, total - processedLocal - processedPeer)
 
     const deltaLocal = profile.deltaLocal
@@ -125,6 +123,44 @@ export class MockExecEngineClient implements IExecEngineClient {
     }
   }
 
+  async getProgressByStage(range: TimeRange): Promise<ProgressByStage> {
+    // Pre-scan fallback: every stage is synthetic + flagged estimated. Mirrors
+    // the per-tab coefficients the dashboard used to apply locally so the demo
+    // visually still looks like four distinct stages.
+    const summary = await this.getProgressSummary(range)
+    const COEFF: Record<ArtifactStage, number> = {
+      scan: 1.0,
+      llm: 0.72,
+      references: 0.55,
+      km: 0.84
+    }
+    const stage = (k: ArtifactStage): StageProgress => {
+      const c = COEFF[k]
+      const processedLocal = Math.floor(summary.processedLocal * c)
+      const processedPeer = Math.floor(summary.processedPeer * c)
+      return {
+        processedLocal,
+        processedPeer,
+        remaining: Math.max(0, summary.totalFiles - processedLocal - processedPeer),
+        deltaLocal: Math.floor(summary.deltaLocal * c),
+        deltaPeer: Math.floor(summary.deltaPeer * c),
+        estimated: true
+      }
+    }
+    return {
+      totalFiles: summary.totalFiles,
+      rangeLabel: summary.rangeLabel,
+      rangeBudget: summary.rangeBudget,
+      etaDays: summary.etaDays,
+      stages: {
+        scan: stage('scan'),
+        llm: stage('llm'),
+        references: stage('references'),
+        km: stage('km')
+      }
+    }
+  }
+
   async getProgressHistory(range: TimeRange): Promise<ProgressHistoryPoint[]> {
     const profile = RANGE_PROFILES[range]
     const points: ProgressHistoryPoint[] = []
@@ -135,11 +171,10 @@ export class MockExecEngineClient implements IExecEngineClient {
     // We then walk forward 25 points (i = 24..0), each adding curveValue() *
     // total delta. The shape of curveValue() varies per range, so 5h's
     // history is end-loaded while 5d's plateaus.
-    const noise = (rangeHash(range) - 0.5) * 2 * profile.cumulativeNoise
-    const finalLocal = Math.floor((4_102 + this.elapsedHours() * 5) * (1 + noise))
+    const finalLocal = Math.floor((4_102 + this.elapsedHours() * 5) * profile.cumulativeScale)
     const finalPeer = Math.floor(
       (318 + Math.sin(this.elapsedHours() / 6) * 40 + this.elapsedHours() * 1.5) *
-        (1 + noise * 0.7)
+        profile.cumulativeScale
     )
     const startLocal = finalLocal - profile.deltaLocal
     const startPeer = finalPeer - profile.deltaPeer

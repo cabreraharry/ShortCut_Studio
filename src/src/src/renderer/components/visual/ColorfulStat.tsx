@@ -43,7 +43,7 @@ const TONE_CLASSES: Record<StatTone, { grad: string; text: string; icon: string 
 }
 
 export interface ColorfulStatProps {
-  label: string
+  label: ReactNode
   value: ReactNode
   sublabel?: ReactNode
   icon?: ReactNode
@@ -76,7 +76,7 @@ export function ColorfulStat({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="text-xs font-medium text-muted-foreground">{label}</div>
+          <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">{label}</div>
           <div className={cn('mt-1 font-mono text-2xl font-semibold', t.text)}>{value}</div>
           {sublabel && <div className="mt-0.5 text-[11px] text-muted-foreground">{sublabel}</div>}
         </div>

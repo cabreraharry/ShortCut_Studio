@@ -45,7 +45,10 @@ const api: ElectronAPI = {
     setDefaultModel: (modelId) =>
       ipcRenderer.invoke(IpcChannel.LlmSetDefaultModel, modelId),
     testConnection: (providerId) =>
-      ipcRenderer.invoke(IpcChannel.LlmTestConnection, providerId)
+      ipcRenderer.invoke(IpcChannel.LlmTestConnection, providerId),
+    discoverModels: (providerId) =>
+      ipcRenderer.invoke(IpcChannel.LlmDiscoverModels, providerId),
+    complete: (req) => ipcRenderer.invoke(IpcChannel.LlmComplete, req)
   },
   settings: {
     get: () => ipcRenderer.invoke(IpcChannel.SettingsGet),
@@ -54,7 +57,8 @@ const api: ElectronAPI = {
   progress: {
     summary: (range) => ipcRenderer.invoke(IpcChannel.ProgressSummary, range),
     jobs: () => ipcRenderer.invoke(IpcChannel.ProgressJobs),
-    history: (range) => ipcRenderer.invoke(IpcChannel.ProgressHistory, range)
+    history: (range) => ipcRenderer.invoke(IpcChannel.ProgressHistory, range),
+    byStage: (range) => ipcRenderer.invoke(IpcChannel.ProgressByStage, range)
   },
   topics: {
     list: () => ipcRenderer.invoke(IpcChannel.TopicsList),
@@ -98,7 +102,12 @@ const api: ElectronAPI = {
     restartWorker: (name) =>
       ipcRenderer.invoke(IpcChannel.DiagnosticsRestartWorker, name),
     tailLog: (name, lines) =>
-      ipcRenderer.invoke(IpcChannel.DiagnosticsTailLog, name, lines)
+      ipcRenderer.invoke(IpcChannel.DiagnosticsTailLog, name, lines),
+    listErrors: (query) =>
+      ipcRenderer.invoke(IpcChannel.DiagnosticsListErrors, query),
+    clearErrors: () => ipcRenderer.invoke(IpcChannel.DiagnosticsClearErrors),
+    recordRendererError: (payload) =>
+      ipcRenderer.invoke(IpcChannel.DiagnosticsRecordRendererError, payload)
   },
   system: {
     openFile: (path) => ipcRenderer.invoke(IpcChannel.SystemOpenFile, path),
@@ -161,6 +170,13 @@ const api: ElectronAPI = {
   },
   network: {
     summary: () => ipcRenderer.invoke(IpcChannel.NetworkSummary)
+  },
+  execengine: {
+    getStatus: () => ipcRenderer.invoke(IpcChannel.ExecEngineGetStatus),
+    setConfig: (config) => ipcRenderer.invoke(IpcChannel.ExecEngineSetConfig, config),
+    signIn: (req) => ipcRenderer.invoke(IpcChannel.ExecEngineSignIn, req),
+    signOut: () => ipcRenderer.invoke(IpcChannel.ExecEngineSignOut),
+    healthCheck: () => ipcRenderer.invoke(IpcChannel.ExecEngineHealthCheck)
   }
 }
 

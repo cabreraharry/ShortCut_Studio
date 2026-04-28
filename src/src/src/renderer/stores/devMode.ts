@@ -1,6 +1,13 @@
 import { create } from 'zustand'
 
-export type DevTab = 'devtools' | 'workers' | 'sql' | 'ipc' | 'storybook' | 'system'
+export type DevTab =
+  | 'devtools'
+  | 'workers'
+  | 'sql'
+  | 'ipc'
+  | 'storybook'
+  | 'system'
+  | 'llm-playground'
 
 export interface IpcEvent {
   id: number

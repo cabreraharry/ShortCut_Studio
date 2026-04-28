@@ -142,14 +142,20 @@ Security: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: false`, 
 
 ### ExecEngine integration
 
-The Electron client's job is to **become the Consumer Peer** for the ExecEngine backend at `D:/ExecEngine/`. ExecEngine's HTTP consumer layer is **not yet implemented** (only internal TCP QUEUE works). For v1, the client depends on the `IExecEngineClient` interface (`src/main/execengine/client.ts`) and uses the mock implementation that returns synthetic peer/progress/IPFS data. Real CP protocol wiring lands in v2.
+The Electron client's job is to **become the Consumer Peer** for the ExecEngine backend at `D:/ExecEngine/`. ExecEngine's HTTP consumer layer is **not yet implemented** (only internal TCP QUEUE works). The client depends on the `IExecEngineClient` interface (`src/main/execengine/client.ts`).
+
+As of 2026-04-28, the factory returns `RealLocalExecEngineClient` (`src/main/execengine/realLocal.ts`) — a hybrid that:
+- Reads real `totalFiles` / `processedLocal` from `SCLFolder_{Publ,Priv}.db` for `getProgressSummary`
+- Delegates everything else (peer counts, IPFS, network summary, topics review/distribution, jobs list) to a private `MockExecEngineClient`
+
+Real CP-protocol wiring of the remaining methods lands in v2 once ExecEngine ships its FastAPI/Nginx layer.
 
 ### Workers
 
 Background processing (scan, watchdog, topic generation) lives in **SCL_Demo** (`D:/Client-Side_Project/SCL_Demo/`) as PyInstaller `.exes`:
 `filescanner`, `rescan`, `root_watchdog`, `topic_watchdog`, `gemini_processor`, `postprocessing`.
 
-The Electron main process's `workers/supervisor.ts` spawns + supervises these. Each `.exe` exposes a small FastAPI HTTP interface (via a shared `SCL_Demo/tools/worker_api.py` module, to be added) on a random localhost port so the main process can query `/health` + `/status` instead of parsing stdout.
+The Electron main process's `workers/supervisor.ts` spawns + supervises these. Each `.exe` exposes a small FastAPI HTTP interface (via the shared `SCL_Demo/tools/worker_api.py` module — adopted in source 2026-04-28; rebuild blocked on venv deps, see `docs/claude-handoff/06-pending-and-caveats.md` item 1) on a localhost port from the `WORKER_HEALTH_PORT` env var so the main process can query `/health` + `/status` instead of parsing stdout.
 
 Auto-restart on crash with backoff; visible in the **Diagnostics** panel in Settings.
 
@@ -213,8 +219,10 @@ When touching these, fix the root rather than working around it:
 1. **`better-sqlite3` is native.** After any Electron version bump, `npx electron-rebuild`. `postinstall` handles this on fresh installs.
 2. **Existing `loc_adm.db` was seeded with VARCHAR(50) columns** — migrations don't change stored rows, just add missing tables. SQLite treats VARCHAR as TEXT at runtime, so practical width is unlimited; the constraint is cosmetic.
 3. **Info Section messages are placeholders** until the owner supplies real copy. Stored in `resources/info-messages.json` when that lands — for now inlined in `InfoSection.tsx`.
-4. **Progress Glass peer data is synthetic** — produced by `MockExecEngineClient.getProgressSummary()` as a sine wave + linear trend. Swap when CP client is real.
-5. **Worker supervisor is a stub** at scaffold time. The real spawn/restart logic lands in the worker-supervisor task — until then, Diagnostics panel shows all workers as 'stopped'.
+4. **Progress Glass peer data is synthetic** — `RealLocalExecEngineClient` reads real local counts from SCLFolder, but peer counts stay 0 (and range deltas/ETA stay synthetic) until ExecEngine's HTTP layer ships. Swap point: `realLocal.ts::getProgressSummary`.
+5. **Worker supervisor spawns are real, but the .exes themselves crash on launch** until SCL_Demo's `.venv` is fully populated. Python source has adopted `worker_api.py`, build scripts use `python -m PyInstaller`, but rebuilds error on missing deps (`psutil` etc.) — see `docs/claude-handoff/06-pending-and-caveats.md` item 1 for the unblock recipe.
+6. **Insights / Folder Health / Knowledge Map / Filters preview are now REAL** (was 100% mock until 2026-04-28). All read from `SCLFolder_{Publ,Priv}.db` via `src/main/db/scl-folder.ts`. Empty / zero fallbacks when no scan has run.
+7. **LLM model auto-discovery + auth-validating test-connection** (added 2026-04-28). New IPC channel `llm:discover-models` calls `Ollama /api/tags`, `OpenAI /v1/models`, `Claude /v1/models`, `Gemini /v1beta/models` and re-populates the `Models` table. `LlmTestConnection` is now a thin wrapper around discovery — auth-passes-iff-discovery-succeeds.
 
 ## Working with This Repo
 

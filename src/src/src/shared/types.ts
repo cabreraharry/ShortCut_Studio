@@ -251,6 +251,136 @@ export interface LlmTestResult {
   error?: string
 }
 
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant'
+  content: string
+}
+
+export interface LlmCompleteRequest {
+  messages: ChatMessage[]
+  /** Override the configured default provider (LLM_Provider.IsDefault='Y'). */
+  providerId?: number
+  /** Override the provider's default model (Models.ProviderDefault='Y'). */
+  modelName?: string
+  /** Sampling temperature; default 0.2. The classifier passes 0 explicitly for deterministic JSON. */
+  temperature?: number
+  /** Cap on output tokens; default 1024. Override per-feature for long-reasoning calls. */
+  maxTokens?: number
+  /** When 'json', sets the provider's structured-output flag (OpenAI response_format, Gemini responseMimeType, Ollama format). */
+  responseFormat?: 'text' | 'json'
+  /** Free-form tag persisted to LLM_Usage for per-feature analytics (e.g. 'classifier', 'topic-rename', 'playground'). */
+  feature?: string
+}
+
+export interface LlmCompleteResult {
+  ok: boolean
+  /** Text body of the response. Empty string is valid (e.g. Claude max_tokens with zero text blocks). */
+  content?: string
+  /** The model that actually served the request (after fallback resolution). */
+  model?: string
+  /** Provider name as stored in LLM_Provider.Provider_Name (e.g. 'OpenAI'). */
+  providerName?: string
+  latencyMs?: number
+  usage?: { tokensIn: number; tokensOut: number }
+  /** True when the provider clipped output (Claude stop_reason=='max_tokens', OpenAI finish_reason=='length'). */
+  truncated?: boolean
+  error?: string
+}
+
+export interface LlmDiscoverResult {
+  ok: boolean
+  latencyMs?: number
+  count?: number
+  /** Model names written to the Models table on success. */
+  models?: string[]
+  /** True when the provider has no /models endpoint and we used a hardcoded fallback list. */
+  fallback?: boolean
+  error?: string
+}
+
+// ---------- ExecEngine connection ----------
+//
+// The Electron client is a "Consumer Peer" in the SCL ecosystem. It auths to
+// the ExecEngine's SIS (Sign-In Service) over HTTP, receiving a stateless
+// SHA256 session token valid for 24h. The token + identity (cp_id, master_id)
+// are persisted to AdminData so reconnect is automatic across restarts; the
+// password itself is never stored.
+//
+// Once authenticated, the client is supposed to exchange CBR / CDREQ / CSCT
+// messages with the Agent Hub over a TCP queue (ports 44998/44999). That
+// transport is not yet implemented in this client — `RealExecEngineClient`
+// presently inherits all data methods from `RealLocalExecEngineClient`, which
+// reads SCLFolder for local progress and falls back to the mock for peer
+// data. As Queue-protocol methods land, individual `IExecEngineClient`
+// methods will be overridden to talk to Agent Hub instead.
+
+export interface ExecEngineConfig {
+  sisHost: string
+  sisPort: number
+}
+
+export interface ExecEngineSession {
+  cpId: string
+  masterId: string
+  expiresAt: number  // epoch seconds
+  /** When the token was issued, for debug display. */
+  issuedAt: number
+}
+
+export type ExecEngineConnectionState =
+  | 'not-configured'      // user has never tried to connect
+  | 'disconnected'        // configured but no live session
+  | 'connecting'          // signin in flight
+  | 'connected'           // valid session
+  | 'expired'             // token past expiry; needs re-signin
+  | 'error'               // last attempt failed
+
+export interface ExecEngineConnectionStatus {
+  state: ExecEngineConnectionState
+  config: ExecEngineConfig
+  session?: ExecEngineSession
+  /** Last error message, if any. Cleared on successful connect. */
+  lastError?: string
+  /** Latency of the most recent /health check, ms. Undefined if never checked. */
+  healthLatencyMs?: number
+  /** True if the most recent /health check succeeded. */
+  healthOk?: boolean
+}
+
+export interface ExecEngineSignInRequest {
+  username: string
+  password: string
+  /** Optional CP instance ID; SIS may auto-assign if absent. */
+  cpId?: string
+}
+
+export interface ExecEngineSignInResult {
+  ok: boolean
+  status: ExecEngineConnectionStatus
+  /** Server-supplied message (e.g. "Authentication successful"). */
+  message?: string
+}
+
+export type ArtifactStage = 'scan' | 'llm' | 'references' | 'km'
+
+export interface StageProgress {
+  processedLocal: number
+  processedPeer: number
+  remaining: number
+  deltaLocal: number
+  deltaPeer: number
+  /** True when the stage is derived from a coefficient (no real column yet). */
+  estimated?: boolean
+}
+
+export interface ProgressByStage {
+  totalFiles: number
+  rangeLabel: string
+  rangeBudget?: number
+  etaDays?: number
+  stages: Record<ArtifactStage, StageProgress>
+}
+
 export type JobStatus = 'queued' | 'running' | 'completed' | 'failed' | 'paused'
 export type JobKind = 'scan' | 'rescan' | 'topics' | 'classify' | 'postprocess'
 
@@ -458,4 +588,41 @@ export interface NetworkSummary {
   dbFiles: DbFileInfo[]
   growth: GrowthPoint[]             // small series for the sparkline
   growthPctChange: number           // rounded % change over the series
+}
+
+// ---------- App-wide errors store ----------
+
+export type AppErrorSource = 'ipc' | 'llm' | 'execengine' | 'worker' | 'renderer' | 'main'
+export type AppErrorSeverity = 'error' | 'warning'
+
+export interface AppError {
+  id: number
+  ts: number                        // ms since epoch
+  source: AppErrorSource
+  severity: AppErrorSeverity
+  category: string | null           // ipc-channel / worker-name / sis-* / route hash
+  message: string
+  stack: string | null
+  /** Already-serialized JSON (redacted). Renderer parses on demand. */
+  context: string | null
+}
+
+export interface ErrorListQuery {
+  limit?: number                    // default 50, max 200
+  offset?: number                   // default 0
+  source?: AppErrorSource | AppErrorSource[]
+  severity?: AppErrorSeverity
+  sinceTs?: number                  // ms since epoch; for "last 24h" badge
+}
+
+export interface ErrorListResult {
+  rows: AppError[]
+  total: number                     // total rows matching the filter (for pagination)
+}
+
+export interface RecordRendererErrorPayload {
+  message: string
+  stack?: string
+  category?: string                 // e.g. route hash
+  context?: Record<string, unknown>
 }

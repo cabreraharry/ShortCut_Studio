@@ -18,7 +18,7 @@ function locAdmDbPath(): string {
     if (!existsSync(target)) {
       const bundledSeed = join(process.resourcesPath, 'db_files', 'loc_adm.db')
       if (existsSync(bundledSeed)) copyFileSync(bundledSeed, target)
-    }
+    } 
     return target
   }
   // dev

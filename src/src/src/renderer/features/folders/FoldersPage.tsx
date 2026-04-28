@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { HelpHint } from '@/components/ui/help-hint'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { toast } from '@/hooks/use-toast'
@@ -116,7 +117,13 @@ function FileTypesCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>File types</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          File types
+          <HelpHint
+            size="sm"
+            label="Global on/off list of file extensions the scanner considers. Disabled types are skipped during scanning. The toggle is global — there's no per-folder override yet."
+          />
+        </CardTitle>
         <CardDescription>
           Click a chip to toggle whether the scanner picks up files of that type.
           Greyed chips aren&apos;t supported yet.
@@ -281,7 +288,13 @@ function FoldersCard() {
       />
       <CardHeader className="flex flex-row items-start justify-between">
         <div>
-          <CardTitle>Indexed folders</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Indexed folders
+            <HelpHint
+              size="sm"
+              label="Folders the scanner watches. An Exclude rule under an Include parent wins — so you can say 'scan C:\\Users\\me\\Documents but skip the Tax subfolder' by adding both rows. Counts to the right are read live from the SCL_Demo scan database."
+            />
+          </CardTitle>
           <CardDescription>
             Green rows are indexed. Orange rows are excluded — they win over any parent include rule.
           </CardDescription>
@@ -456,13 +469,31 @@ function FolderRowItem({
               {row.path}
             </span>
             {row.fileCount !== undefined && (
-              <div className="flex flex-wrap gap-1.5 text-[10px] text-muted-foreground">
-                <span>{row.fileCount} files</span>
+              <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+                <span className="inline-flex items-center gap-1">
+                  {row.fileCount} files
+                  <HelpHint
+                    size="xs"
+                    label="Files inside this folder (and its subfolders) that the scanner has indexed and not flagged ignore. Live count from SCL_Demo's Files table."
+                  />
+                </span>
                 {row.dupeCount !== undefined && row.dupeCount > 0 && (
-                  <span className="text-amber-700 dark:text-amber-400/90">· {row.dupeCount} dupes</span>
+                  <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400/90">
+                    · {row.dupeCount} dupes
+                    <HelpHint
+                      size="xs"
+                      label="Files the scanner detected as content-duplicates of another file (same hash / same body). They're still indexed but flagged for dedup."
+                    />
+                  </span>
                 )}
                 {row.privacyMatchCount !== undefined && row.privacyMatchCount > 0 && (
-                  <span className="text-rose-700 dark:text-rose-400/90">· {row.privacyMatchCount} private</span>
+                  <span className="inline-flex items-center gap-1 text-rose-700 dark:text-rose-400/90">
+                    · {row.privacyMatchCount} private
+                    <HelpHint
+                      size="xs"
+                      label="Files whose name matches one of your Privacy terms. These get routed to the Private database (instead of Public) so they never get shared on the peer network."
+                    />
+                  </span>
                 )}
               </div>
             )}

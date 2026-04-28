@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Bot, SlidersHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { HelpHint } from '@/components/ui/help-hint'
 import { api } from '@/lib/api'
 import type {
   ClassifyFileInput,
@@ -58,6 +59,10 @@ export default function FilterWorkbenchPage(): JSX.Element {
           <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
             <SlidersHorizontal className="h-6 w-6" />
             Filter workbench
+            <HelpHint
+              size="sm"
+              label="Build rules that decide which scanned files are 'publications' (papers/books/reports) vs 'noise' (receipts, drafts, screenshots). Rules combine with AND. Save reusable rule sets as presets. Use 'Classify with AI' to label ambiguous filenames in bulk."
+            />
           </h1>
           <p className="text-sm text-muted-foreground">
             Compose filter rules to isolate publications from noise. Tune live, classify filenames with AI,
@@ -70,15 +75,25 @@ export default function FilterWorkbenchPage(): JSX.Element {
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Rules</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2">
+              Rules
+              <HelpHint
+                size="xs"
+                label="Each rule narrows the result. A file must pass EVERY enabled rule to count as matched (logical AND). Toggle a rule's checkbox to disable it without losing the configured value — handy for A/B comparisons."
+              />
+            </CardTitle>
             <CardDescription>
               All enabled rules must pass (AND). Disable a rule to A/B-test without deleting it.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <label className="mb-1 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Folder scope
+                <HelpHint
+                  size="xs"
+                  label="Restrict the preview + classify to one folder, or 'All folders' to run rules across your whole library. Folder names come from your indexed Folders list."
+                />
               </label>
               <select
                 value={ruleSet.folder ?? ''}
@@ -106,12 +121,17 @@ export default function FilterWorkbenchPage(): JSX.Element {
                 type="button"
                 onClick={() => setClassifyOpen(true)}
                 disabled={classifiableFilenames.length === 0}
+                title="Send filenames to your default LLM and ask for a per-file 'publication / other' label. Labels are stored and the 'AI label' rule type can match against them."
               >
                 <Bot className="mr-1 h-4 w-4" />
                 Classify with AI
               </Button>
-              <span className="text-[11px] text-muted-foreground">
+              <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
                 {classifiableFilenames.length} file{classifiableFilenames.length === 1 ? '' : 's'} in scope
+                <HelpHint
+                  size="xs"
+                  label="Files inside the selected folder scope that don't already have an AI label. Classifying these adds a 'publication' or 'other' label that rules can match against."
+                />
               </span>
             </div>
           </CardContent>

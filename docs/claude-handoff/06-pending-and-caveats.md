@@ -4,44 +4,52 @@ If you're a future Claude session (or a human developer) about to add a feature 
 
 ## High-priority caveats (read first)
 
-### 1. Workers need to be rebuilt before the Diagnostics panel shows real data
+### 1. Worker .exe rebuilds — Python source adopted, build env still blocked (UPDATED 2026-04-28)
 
-The supervisor in `src/main/workers/supervisor.ts` spawns SCL_Demo's `.exes`. But until each worker's Python source adopts `SCL_Demo/tools/worker_api.py` and is rebuilt via its `_ps1/build_*_exe.ps1` script, health pings will time out silently. The workers will still run — you just won't see live status.
+**Status: Python adoption complete; PyInstaller rebuilds fail on missing venv deps.**
 
-**To do next:**
-1. Edit `SCL_Demo/scan/root_watchdog_main.py` (or wherever the watchdog's entry point is) to call `start_worker_api(default_port=19001, default_status={...})`
-2. Rebuild via `SCL_Demo/_ps1/build_root_watchdog_exe.ps1`
+The supervisor in `src/main/workers/supervisor.ts` spawns SCL_Demo's `.exes`. ALL pre-existing `.exe`s in `SCL_Demo/_exe/` (including the untouched `filescanner.exe`, `rescan.exe`, etc.) have been crashing on launch since May 2025 with `ModuleNotFoundError: No module named 'tools'` — confirmed against `_exe/root_watchdog.exe.bak`. So health pings haven't been "timing out silently" — the workers were never actually starting.
+
+**Changes already applied to SCL_Demo (2026-04-28):**
+- `start_worker_api(default_port=19001|19002|19003, default_status={...})` added to top of `main()` in `scan/multi_watchdog_manager.py`, `scan/topic_watchdog.py`, `topics/process_data_Gemini.py`
+- Empty `__init__.py` added to `tools/`, `scan/`, `topics/` (was the silent root cause — PyInstaller dropped namespace packages)
+- All three `_ps1/build_*_exe.ps1` updated: invoke as `python -m PyInstaller` (was using the system-Python `pyinstaller` shim, missing every venv-only dep) + uvicorn hiddenimports added
+- Installed in `.venv`: `pyinstaller 6.20.0`, `fastapi 0.136.1`, `uvicorn[standard] 0.46.0`
+
+**Still blocking the rebuild:**
+- `psutil` (imported by `scan/watchdog_json_manager.py`) is not in the `.venv` — `root_watchdog` and `topic_watchdog` builds will fail
+- Likely more deps missing further down the import chain. `requirements.txt` is UTF-16 encoded and outdated.
+
+**To finish:**
+1. `cd D:/Client-Side_Project/SCL_Demo && .venv/Scripts/Activate.ps1 && pip install psutil`
+2. Run `./_ps1/build_root_watchdog_exe.ps1`, identify next missing dep, install, repeat until the smoke test (run the .exe with `WORKER_HEALTH_PORT=19001` and `curl http://127.0.0.1:19001/health` returns `{"ok":true}`)
 3. Repeat for `topic_watchdog` and `gemini_processor`
-4. See `SCL_Demo/tools/WORKER_API_INTEGRATION.md` for the PyInstaller `hiddenimports` list you'll need to add to each `.spec` (uvicorn's lifespan / protocols / loops submodules).
+4. `pip freeze > requirements.txt` to capture the working dep set
+5. `_exe/*.exe.bak` safety copies left in `_exe/` — delete once new builds verified
 
-### 2. Workers aren't bundled into the installer yet
+### 2. Workers + seed DBs are now bundled into the installer (DONE 2026-04-28)
 
-`electron-builder.yml::extraResources` only copies `exe/` (LocalHostTools binaries). The SCL_Demo workers live at `D:/Client-Side_Project/SCL_Demo/_exe/` — they're referenced at runtime via `resolveWorkersDir()` which falls back to that hardcoded path if the packaged `resources/workers/` doesn't exist.
+`electron-builder.yml::extraResources` now ships:
+- `exe/` (LocalHostTools binaries) → `resources/exe/`
+- `SCL_Demo/_exe/{root_watchdog,topic_watchdog,gemini_processor}.exe` → `resources/workers/`
+- `SCL_Demo/db_files/SCLFolder_{Publ,Priv}.db` → `resources/scl_db_seed/`
 
-**To actually ship workers in the installer**, add to `electron-builder.yml`:
+`config.ts::resolveWorkersDir` already picks up `<resourcesPath>/workers/` as its first choice in packaged builds. `db/scl-folder.ts::sclDbDir` copies seed DBs from `resources/scl_db_seed/` to `userData/scl_db_files/` on first launch.
 
-```yaml
-extraResources:
-  - from: exe
-    to: exe
-    filter: ['**/*']
-  - from: ../../../SCL_Demo/_exe          # ← new block
-    to: workers
-    filter: ['*.exe']
-```
+**Caveat:** the bundled workers are still the broken pre-2026-04-28 `.exe`s until item #1 above is unblocked. New builds drop in via the existing `extraResources` block — no further config change needed.
 
-And ensure `src/main/workers/config.ts::resolveWorkersDir` picks up `<resourcesPath>/workers/` before the dev-sibling fallback (it already does — just needs the files to actually be there).
+### 3. Progress Glass — local is REAL, peer still synthetic (UPDATED 2026-04-28)
 
-### 3. Progress Glass peer data is synthetic
+`src/main/execengine/client.ts::getExecEngine()` now returns `RealLocalExecEngineClient` (`src/main/execengine/realLocal.ts`):
+- `totalFiles` = `SELECT COUNT(*) FROM Files WHERE IgnoreFile='N'` against `SCLFolder_{Publ,Priv}.db`
+- `processedLocal` = same query with `Probability > 0`
+- `processedPeer` = 0 (no peer data source until ExecEngine HTTP layer ships)
+- `remaining` = `totalFiles - processedLocal`
+- `rangeLabel`, `deltaLocal`, `deltaPeer`, `etaDays`, `rangeBudget` — still come from the per-range mock curve until `ProgressSnapshots` is populated by a background timer (v1.5)
 
-`src/main/execengine/mock.ts::MockExecEngineClient.getProgressSummary` returns:
-- `processedLocal` = floor(4102 + hours * 5)
-- `processedPeer` = floor(318 + sin(hours/6) * 40 + hours * 1.5)
-- `etaDays` = remaining / (deltaLocal + deltaPeer)
+If no SCLFolder DB exists yet (fresh install pre-scan), falls back entirely to the mock so the dashboard isn't a wall of zeros.
 
-This is deterministic synthetic data that ONLY FEELS LIVE because time moves forward. It has nothing to do with real scan progress. When you see the Glass filling during a dev session, that's the mock, not your scanner.
-
-**Where to swap:** `src/main/execengine/client.ts::getExecEngine()` factory. Change `new MockExecEngineClient()` to `new RealExecEngineClient(...)` when the real one exists.
+**Forward path:** when ExecEngine's HTTP/FastAPI consumer-peer layer ships, replace `RealLocalExecEngineClient`'s `getProgressSummary` peer numbers with real reads. The other 9 mock-delegated methods (IPFS, network summary, topics review/distribution, etc.) need similar swaps then.
 
 ### 4. ExecEngine's HTTP layer doesn't exist yet
 

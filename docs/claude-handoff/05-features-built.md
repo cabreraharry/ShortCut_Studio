@@ -60,9 +60,10 @@ Two-section page: **File types** (chip toggles) + **Indexed folders** (include/e
 
 | File | Content |
 |---|---|
-| `src/main/ipc/llm.ts` | `LlmListProviders`, `LlmUpdateKey`, `LlmListModels`, `LlmAddModel`, `LlmSetDefaultModel`, `LlmTestConnection` |
+| `src/main/ipc/llm.ts` | `LlmListProviders`, `LlmUpdateKey`, `LlmListModels`, `LlmAddModel`, `LlmSetDefaultModel`, `LlmTestConnection`, `LlmDiscoverModels` |
+| `src/main/llm/modelDiscovery.ts` | Per-provider auth-validating discovery (Ollama `/api/tags`, OpenAI `/v1/models`, Claude `/v1/models`, Gemini `/v1beta/models`) |
 
-`LlmTestConnection` issues a `GET` to the provider's `API_Host` via `electron.net`. Returns `ok` + `latencyMs` or `error`. It's a reachability check, not a completion call — good enough for the "is the URL + auth working?" signal.
+As of 2026-04-28: `LlmDiscoverModels` calls the provider's models endpoint with the stored key, and on success transactionally clears + repopulates `Models` for that provider. Anthropic 404 falls back to a hardcoded recent-Claude list. `LlmTestConnection` is now a thin wrapper around discovery (auth-passes-iff-discovery-succeeds) — replaces the prior reachability-only ping.
 
 **Schema:** `LLM_Provider(API_Key)` widened to `TEXT` (was `VARCHAR(50)` and silently truncating real keys). Pre-seeded with Ollama / OpenAI / Claude / Gemini.
 
@@ -73,13 +74,14 @@ Two-section page: **File types** (chip toggles) + **Indexed folders** (include/e
 - **Provider cards** — API key input with show/hide (eye icon), badge for key-set state, "Default" badge if `IsDefault='Y'`, Test button with loading spinner + success/failure result line
 - **Onboarding modal** — `OnboardingDialog.tsx` renders canned step-by-step guides for OpenAI, Claude, Gemini, Ollama. Each step can have an "Open in browser" link button (uses `api.app.openExternal`).
 - **Ollama** is specially treated — no key needed; Test button pings the host directly.
+- **Refresh models button** (added 2026-04-28) — calls `api.llm.discoverModels(providerId)`. On success a green badge shows count + first 3 model names; on auth failure a red toast says "Auth failed — check the API key". Disabled for non-Ollama providers when no key is set.
 
 `src/renderer/features/llm/provider-onboarding.ts` — the canned `PROVIDER_GUIDES` dict. Steps hand-written, with real signup URLs and key-format hints.
 
 **Not yet:**
 - Usage / cost visibility (v1.5 — `LLM_Usage` table exists but nothing writes to it yet).
 - Per-feature provider override picker (topics → Gemini, classify → OpenAI, etc.). Architecture supports it; UI doesn't expose it yet.
-- Model list editing UI. The `Models` table is populated (Ollama has pre-seeded models) and handlers exist (`listModels` / `addModel` / `setDefaultModel`), but the Models list isn't surfaced on the page yet.
+- Model list editing UI on the page itself. The `Models` table is populated (and now auto-refreshable via `discoverModels`), but a list/edit UI isn't shown — only the count + first 3 names in the discover-result line.
 
 ---
 
@@ -115,7 +117,7 @@ Two-section page: **File types** (chip toggles) + **Indexed folders** (include/e
 
 ## 5 · Dashboard — Progress Glass (flagship)
 
-**Status: ✓ v1 complete with synthetic peer data.**
+**Status: ✓ v1 complete with REAL local + synthetic peer data.** As of 2026-04-28, `RealLocalExecEngineClient` reads `totalFiles` and `processedLocal` from `SCLFolder_*.db`. Peer counts stay 0 with synthetic ETA labels until ExecEngine's HTTP layer ships.
 
 ### Renderer components
 
@@ -137,10 +139,11 @@ Legend under the glass: two colored squares labelled Local / Peer.
 
 ### Data source
 
-`api.progress.summary(range)` + `api.progress.jobs()` — both polled every 3 s via React Query. Data comes from `MockExecEngineClient`:
-- **Local** grows linearly with elapsed runtime
-- **Peer** is a sine wave + linear baseline — looks alive, deterministic
-- **ETA** is a naive extrapolation from the current delta
+`api.progress.summary(range)` + `api.progress.jobs()` — both polled every 3 s via React Query. Data flows through `RealLocalExecEngineClient` (`src/main/execengine/realLocal.ts`):
+- **Local** is `SELECT COUNT(*) FROM Files WHERE IgnoreFile='N'` (totalFiles) and `WHERE Probability > 0` (processedLocal) against `SCLFolder_{Publ,Priv}.db`
+- **Peer** stays 0 by design (no peer data source yet — synthetic faking would mislead users during real scans)
+- **Range deltas + ETA labels** still come from the mock per-range curve until `ProgressSnapshots` is populated by a background timer (v1.5)
+- **Fresh install fallback**: when no SCLFolder DB exists yet, falls back to mock numbers so dashboard isn't all zeros
 
 ### Active jobs panel
 
@@ -163,7 +166,7 @@ Below the Glass, showing a list of `Job` entries from `listJobs()`. Each row: st
 |---|---|
 | `src/main/ipc/ipfs.ts` | `IpfsStatus`, `IpfsSetAllocation` — delegates to `getExecEngine()` |
 
-All calls go through `IExecEngineClient`, which in v1 is `MockExecEngineClient` returning `running: false`, `peerCount: 0`, `minAllocationGb: 8`, empty byte counts.
+All calls go through `IExecEngineClient`. As of 2026-04-28 this is `RealLocalExecEngineClient`, which delegates IPFS-specific methods to its private `MockExecEngineClient` (real IPFS data still needs ExecEngine's HTTP layer). Returns `running: false`, `peerCount: 0`, `minAllocationGb: 8`, empty byte counts.
 
 ### Renderer
 
@@ -227,7 +230,7 @@ All calls go through `IExecEngineClient`, which in v1 is `MockExecEngineClient` 
 
 ## 9 · Worker supervisor + Python FastAPI wrapper
 
-**Status: ✓ supervisor-side complete. Worker-side adoption pending (needs SCL_Demo .exe rebuilds).**
+**Status: ✓ supervisor-side complete. ⚠️ Worker-side adoption merged into Python source (2026-04-28); .exe rebuilds blocked on SCL_Demo .venv dep gaps.**
 
 ### Supervisor (`src/main/workers/supervisor.ts`)
 
@@ -250,9 +253,12 @@ Spawns a daemon thread running uvicorn + FastAPI. Exposes `/health` (uptime) and
 
 Integration guide at `SCL_Demo/tools/WORKER_API_INTEGRATION.md` — explains PyInstaller `hiddenimports` for uvicorn, rebuild order, and how to verify a worker has been wired.
 
-**Not yet:**
-- Actual adoption by SCL_Demo workers. Each worker (`root_watchdog`, `topic_watchdog`, `gemini_processor`) needs ~3 lines of code added + a PyInstaller rebuild. Diagnostics panel shows workers as `stopped` until they're rebuilt with the wrapper.
-- Bundling workers into the installer. `electron-builder.yml`'s `extraResources` currently only copies `exe/` (LocalHostTools binaries). To bundle `SCL_Demo/_exe/` into the installer, add another `extraResources` entry pointing at it.
+**Adoption status (2026-04-28):**
+- ✅ `start_worker_api(...)` calls added to `multi_watchdog_manager.py`, `topic_watchdog.py`, `process_data_Gemini.py` (top of `main()` in each).
+- ✅ `tools/`, `scan/`, `topics/` converted from namespace packages to regular packages by adding empty `__init__.py` (PyInstaller handles regular packages reliably; namespace packages were silently dropped).
+- ✅ Build scripts (`_ps1/build_*_exe.ps1`) updated: invoke as `python -m PyInstaller` instead of `pyinstaller` (the global shim was resolving against system Python and missing every venv-only dep — silent root cause of the .exes having been broken since May 2025).
+- ✅ `electron-builder.yml::extraResources` now bundles workers + seed `SCLFolder_*.db` files.
+- ❌ Actual `.exe` rebuilds: blocked. SCL_Demo's `.venv` is missing many deps (`pyinstaller`, `fastapi`, `uvicorn` were installed during this session; `psutil` and likely others still missing). Iterating "install missing dep → rebuild → catch next missing dep" needs a dedicated SCL_Demo session. `_exe/*.exe.bak` safety copies left in place. Diagnostics panel will continue showing workers as `running` (process up) without `lastHealthCheck` until the rebuild succeeds.
 
 ---
 
@@ -265,7 +271,7 @@ Integration guide at `SCL_Demo/tools/WORKER_API_INTEGRATION.md` — explains PyI
 - `appId: com.scl.admin`
 - `productName: ShortCut Studio`
 - Output: `release-builds/` (NSIS .exe at root, `win-unpacked/` alongside for smoke testing)
-- `extraResources` copies `exe/` into the bundled app's `resources/exe/`
+- `extraResources` copies `exe/` into `resources/exe/`, `SCL_Demo/_exe/{root_watchdog,topic_watchdog,gemini_processor}.exe` into `resources/workers/`, and `SCL_Demo/db_files/SCLFolder_{Publ,Priv}.db` into `resources/scl_db_seed/` (seeded into `userData/scl_db_files/` on first launch by `scl-folder.ts`)
 - `asarUnpack` unpacks `resources/**` and `node_modules/better-sqlite3/**` (native module needs to live on the real filesystem, not inside asar)
 - NSIS options: `oneClick: false`, `allowToChangeInstallationDirectory: true`, `createDesktopShortcut: true`
 

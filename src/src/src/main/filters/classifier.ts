@@ -15,6 +15,7 @@ import { geminiAdapter } from './providers/gemini'
 import { ollamaAdapter } from './providers/ollama'
 import { mockAdapter } from './providers/mock'
 import { clipboardAdapter } from './providers/clipboard'
+import { PROVIDER_NAME_BY_CODE } from '../llm/providerName'
 
 const ADAPTERS: Record<ClassifierProvider, ClassifierAdapter> = {
   claude: claudeAdapter,
@@ -28,13 +29,6 @@ const ADAPTERS: Record<ClassifierProvider, ClassifierAdapter> = {
 interface ProviderConfig {
   apiKey: string
   apiHost: string
-}
-
-const PROVIDER_NAME_BY_CODE: Record<string, ClassifierProvider> = {
-  Claude: 'claude',
-  OpenAI: 'openai',
-  Gemini: 'gemini',
-  Ollama: 'ollama'
 }
 
 function loadProviderConfig(provider: ClassifierProvider): ProviderConfig {

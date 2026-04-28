@@ -1,5 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Eye, EyeOff, Info, HelpCircle, Check, X, Loader2, ShieldAlert } from 'lucide-react'
+import {
+  Eye,
+  EyeOff,
+  Info,
+  HelpCircle,
+  Check,
+  X,
+  Loader2,
+  ShieldAlert,
+  RefreshCw
+} from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -7,7 +17,9 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
-import type { LlmProvider, LlmTestResult } from '@shared/types'
+import type { LlmDiscoverResult, LlmProvider, LlmTestResult } from '@shared/types'
+import { HelpHint } from '@/components/ui/help-hint'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { OnboardingDialog } from './OnboardingDialog'
 import { PROVIDER_GUIDES, type ProviderGuide } from './provider-onboarding'
 import { ProviderHub } from '@/components/visual/ProviderHub'
@@ -61,7 +73,13 @@ export default function LlmPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Providers</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Providers
+            <HelpHint
+              size="sm"
+              label="Each card is one AI service SCL can talk to. Paste the provider's API key, click Test to confirm auth, then Refresh models to pull the live model list. The provider marked Default is used by features that don't pick one explicitly (e.g. Topic generation)."
+            />
+          </CardTitle>
           <CardDescription>
             Enable a provider by adding an API key (or running Ollama locally). The provider set as default is used when a feature doesn&apos;t override it.
           </CardDescription>
@@ -131,6 +149,7 @@ function ProviderCard({
   const [showKey, setShowKey] = useState(false)
   const [keyDraft, setKeyDraft] = useState(provider.apiKey)
   const [testResult, setTestResult] = useState<LlmTestResult | null>(null)
+  const [discoverResult, setDiscoverResult] = useState<LlmDiscoverResult | null>(null)
 
   const updateKey = useMutation({
     mutationFn: (key: string) => api.llm.updateKey(provider.providerId, key),
@@ -140,6 +159,14 @@ function ProviderCard({
   const testConnection = useMutation({
     mutationFn: () => api.llm.testConnection(provider.providerId),
     onSuccess: (result) => setTestResult(result)
+  })
+
+  const discoverModels = useMutation({
+    mutationFn: () => api.llm.discoverModels(provider.providerId),
+    onSuccess: (result) => {
+      setDiscoverResult(result)
+      qc.invalidateQueries({ queryKey: ['models', provider.providerId] })
+    }
   })
 
   const guide = PROVIDER_GUIDES[provider.providerName]
@@ -168,13 +195,43 @@ function ProviderCard({
           <span className="font-semibold" style={{ color: active ? brand.solid : undefined }}>
             {provider.providerName}
           </span>
-          {provider.isDefault === 'Y' && <Badge variant="outline">Default</Badge>}
+          {provider.isDefault === 'Y' && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span><Badge variant="outline">Default</Badge></span>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                Used by features that don't specify a provider. Exactly one provider is the default at any time.
+              </TooltipContent>
+            </Tooltip>
+          )}
           {isOllama ? (
-            <Badge variant="secondary">Local</Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span><Badge variant="secondary">Local</Badge></span>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                Runs entirely on your PC. Nothing leaves the machine. No API key required — just install Ollama and start the daemon.
+              </TooltipContent>
+            </Tooltip>
           ) : hasKey ? (
-            <Badge variant="success">Key set</Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span><Badge variant="success">Key set</Badge></span>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                An API key is stored. Hasn't been validated yet — click Test to confirm it actually works.
+              </TooltipContent>
+            </Tooltip>
           ) : (
-            <Badge variant="outline">No key</Badge>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span><Badge variant="outline">No key</Badge></span>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                Provider isn't usable yet. Paste an API key to enable it.
+              </TooltipContent>
+            </Tooltip>
           )}
         </div>
         {guide && (
@@ -227,6 +284,20 @@ function ProviderCard({
             ) : null}
             Test
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => discoverModels.mutate()}
+            disabled={discoverModels.isPending || !hasKey}
+            title={hasKey ? 'Fetch model list from provider' : 'Add an API key first'}
+          >
+            {discoverModels.isPending ? (
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-1 h-3 w-3" />
+            )}
+            Refresh models
+          </Button>
         </div>
       )}
       {isOllama && (
@@ -246,10 +317,53 @@ function ProviderCard({
             ) : null}
             Test
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => discoverModels.mutate()}
+            disabled={discoverModels.isPending}
+          >
+            {discoverModels.isPending ? (
+              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+            ) : (
+              <RefreshCw className="mr-1 h-3 w-3" />
+            )}
+            Refresh models
+          </Button>
         </div>
       )}
 
       {testResult && <TestResultLine result={testResult} />}
+      {discoverResult && <DiscoverResultLine result={discoverResult} />}
+    </div>
+  )
+}
+
+function DiscoverResultLine({ result }: { result: LlmDiscoverResult }) {
+  return (
+    <div
+      className={cn(
+        'mt-2 flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs',
+        result.ok
+          ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300'
+          : 'border-destructive/30 bg-destructive/10 text-destructive'
+      )}
+    >
+      {result.ok ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+      {result.ok ? (
+        <span className="flex-1 truncate">
+          Discovered {result.count} model{result.count === 1 ? '' : 's'}
+          {result.fallback ? ' (fallback list)' : ''}
+          {result.models && result.models.length > 0 && (
+            <span className="ml-2 font-mono opacity-70">
+              {result.models.slice(0, 3).join(', ')}
+              {result.models.length > 3 ? `, +${result.models.length - 3}` : ''}
+            </span>
+          )}
+        </span>
+      ) : (
+        <span>Failed: {result.error}</span>
+      )}
     </div>
   )
 }

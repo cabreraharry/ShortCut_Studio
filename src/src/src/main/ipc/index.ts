@@ -19,8 +19,13 @@ import { registerKnowledgeMapHandlers } from './knowledgeMap'
 import { registerDevHandlers } from './dev'
 import { registerSystemCheckHandlers } from './system-check'
 import { registerNetworkHandlers } from './network'
+import { registerExecEngineHandlers } from './execengine'
+import { installIpcErrorTrap } from './installErrorTrap'
 
 export function registerIpcHandlers(): void {
+  // Must run before any sub-register so all subsequent ipcMain.handle calls
+  // get wrapped. Throws inside any handler land in the AppErrors table.
+  installIpcErrorTrap()
   registerAppHandlers()
   registerModeHandlers()
   registerDataSourceHandlers()
@@ -42,4 +47,5 @@ export function registerIpcHandlers(): void {
   registerDevHandlers()
   registerSystemCheckHandlers()
   registerNetworkHandlers()
+  registerExecEngineHandlers()
 }

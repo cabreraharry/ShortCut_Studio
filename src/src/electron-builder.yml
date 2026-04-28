@@ -11,9 +11,29 @@ files:
   - package.json
 
 extraResources:
+  # Tray + window icon — loaded at runtime by tray.ts via process.resourcesPath/icon.ico.
+  # Without this entry, packaged builds have no icon to load and the tray slot
+  # would render blank.
+  - from: resources/icon.ico
+    to: icon.ico
   - from: exe
     to: exe
     filter: ['**/*']
+  # SCL_Demo background workers — supervisor reads them from
+  # process.resourcesPath/workers in packaged builds (config.ts:resolveWorkersDir).
+  - from: ../../../SCL_Demo/_exe
+    to: workers
+    filter:
+      - root_watchdog.exe
+      - topic_watchdog.exe
+      - gemini_processor.exe
+  # Seed SCLFolder DBs — copied to userData on first launch by scl-folder.ts so
+  # Insights/Dashboard show real data before the user runs their first scan.
+  - from: ../../../SCL_Demo/db_files
+    to: scl_db_seed
+    filter:
+      - SCLFolder_Publ.db
+      - SCLFolder_Priv.db
 
 asarUnpack:
   - resources/**

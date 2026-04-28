@@ -12,6 +12,7 @@ import { PeerNetwork } from '@/components/visual/PeerNetwork'
 import { AllocationDisc } from '@/components/visual/AllocationDisc'
 import { Hero } from '@/components/visual/Hero'
 import { useCountUp } from '@/hooks/use-count-up'
+import { HelpHint } from '@/components/ui/help-hint'
 
 function bytesToGb(b: number) {
   return b / (1024 ** 3)
@@ -63,14 +64,30 @@ export default function CommunityPage() {
         <PeerNetwork peerCount={status?.peerCount ?? 0} />
         <div className="grid grid-rows-2 gap-3">
           <ColorfulStat
-            label="Stored locally"
+            label={
+              <>
+                Stored locally
+                <HelpHint
+                  size="xs"
+                  label="Bytes that the IPFS node has cached on this PC, including pieces fetched from peers. Always 0 in v1 — controls are inert until ExecEngine ships its IPFS layer."
+                />
+              </>
+            }
             value={status ? `${bytesToGb(status.storedBytes).toFixed(2)} GB` : '—'}
             tone="local"
             icon={<HardDrive className="h-4 w-4" />}
             className="h-full"
           />
           <ColorfulStat
-            label="Shared with peers"
+            label={
+              <>
+                Shared with peers
+                <HelpHint
+                  size="xs"
+                  label="Bytes of YOUR processed data that other peers have pulled from this PC. Always 0 in v1."
+                />
+              </>
+            }
             value={status ? `${bytesToGb(status.sharedBytes).toFixed(2)} GB` : '—'}
             tone="primary"
             icon={<Share2 className="h-4 w-4" />}
@@ -81,7 +98,13 @@ export default function CommunityPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Disk allocation</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            Disk allocation
+            <HelpHint
+              size="sm"
+              label="The disk budget you're willing to give the SCL peer network for storing OTHER PEOPLE'S processed metadata (topics, embeddings, summaries — never their original files). In return, your own metadata gets faster propagation. Minimum is computed from your library size; max is 500 GB. v1: persisted to settings but not yet enforced."
+            />
+          </CardTitle>
           <CardDescription>
             How much space you&apos;ll dedicate to community-shared processing results. Minimum calculated from your own scanned files.
           </CardDescription>

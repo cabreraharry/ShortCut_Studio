@@ -15,6 +15,12 @@ import type {
   NetworkSummary,
   SystemCheckResult,
   DriveInfo,
+  ErrorListQuery,
+  ErrorListResult,
+  ExecEngineConfig,
+  ExecEngineConnectionStatus,
+  ExecEngineSignInRequest,
+  ExecEngineSignInResult,
   FileTypeFilter,
   FilterPreset,
   FilterPreviewResult,
@@ -28,12 +34,17 @@ import type {
   Job,
   KnowledgeMapGraph,
   KnowledgeMapParams,
+  LlmCompleteRequest,
+  LlmCompleteResult,
+  LlmDiscoverResult,
   LlmModel,
   LlmProvider,
   LlmTestResult,
   PrivacyTerm,
+  ProgressByStage,
   ProgressHistoryPoint,
   ProgressSummary,
+  RecordRendererErrorPayload,
   SuperCategory,
   TimeRange,
   TopicDistribution,
@@ -80,6 +91,8 @@ export interface ElectronAPI {
     addModel: (providerId: number, name: string) => Promise<LlmModel>
     setDefaultModel: (modelId: number) => Promise<void>
     testConnection: (providerId: number) => Promise<LlmTestResult>
+    discoverModels: (providerId: number) => Promise<LlmDiscoverResult>
+    complete: (req: LlmCompleteRequest) => Promise<LlmCompleteResult>
   }
   settings: {
     get: () => Promise<AppSettings>
@@ -89,6 +102,7 @@ export interface ElectronAPI {
     summary: (range: TimeRange) => Promise<ProgressSummary>
     jobs: () => Promise<Job[]>
     history: (range: TimeRange) => Promise<ProgressHistoryPoint[]>
+    byStage: (range: TimeRange) => Promise<ProgressByStage>
   }
   topics: {
     list: () => Promise<TopicListResult>
@@ -121,6 +135,9 @@ export interface ElectronAPI {
     workers: () => Promise<WorkerStatus[]>
     restartWorker: (name: string) => Promise<void>
     tailLog: (name: string, lines?: number) => Promise<string>
+    listErrors: (query?: ErrorListQuery) => Promise<ErrorListResult>
+    clearErrors: () => Promise<{ deleted: number }>
+    recordRendererError: (payload: RecordRendererErrorPayload) => Promise<void>
   }
   system: {
     openFile: (path: string) => Promise<{ via: 'localhost' | 'shell' | 'none' }>
@@ -172,6 +189,13 @@ export interface ElectronAPI {
   }
   network: {
     summary: () => Promise<NetworkSummary>
+  }
+  execengine: {
+    getStatus: () => Promise<ExecEngineConnectionStatus>
+    setConfig: (config: ExecEngineConfig) => Promise<ExecEngineConnectionStatus>
+    signIn: (req: ExecEngineSignInRequest) => Promise<ExecEngineSignInResult>
+    signOut: () => Promise<ExecEngineConnectionStatus>
+    healthCheck: () => Promise<ExecEngineConnectionStatus>
   }
 }
 

@@ -11,7 +11,7 @@ import type {
 } from '@shared/types'
 import { getLocAdmDb } from '../db/connection'
 import { getExecEngine } from '../execengine/client'
-import { getAllDocumentInsights } from '../mock/insights'
+import { getAllDocumentInsightsReal } from '../db/scl-folder'
 
 interface SuperCategoryRow {
   SuperCategoryID: number
@@ -102,7 +102,7 @@ export function registerKnowledgeMapHandlers(): void {
       const supers = loadSuperCategories()
       const topicToSc = loadTopicSuperCategoryMap()
       const topics = await getExecEngine().getTopicDistribution()
-      const filePool = getAllDocumentInsights()
+      const filePool = getAllDocumentInsightsReal()
       const aiLabels = loadAiLabels()
 
       const scById = new Map<number, SuperCategoryRow>(
