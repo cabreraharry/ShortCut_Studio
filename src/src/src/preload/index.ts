@@ -48,7 +48,9 @@ const api: ElectronAPI = {
       ipcRenderer.invoke(IpcChannel.LlmTestConnection, providerId),
     discoverModels: (providerId) =>
       ipcRenderer.invoke(IpcChannel.LlmDiscoverModels, providerId),
-    complete: (req) => ipcRenderer.invoke(IpcChannel.LlmComplete, req)
+    complete: (req) => ipcRenderer.invoke(IpcChannel.LlmComplete, req),
+    fetchOpenAiUsage: (providerId) =>
+      ipcRenderer.invoke(IpcChannel.LlmFetchOpenAiUsage, providerId)
   },
   settings: {
     get: () => ipcRenderer.invoke(IpcChannel.SettingsGet),

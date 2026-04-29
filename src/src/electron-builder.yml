@@ -27,13 +27,38 @@ extraResources:
       - root_watchdog.exe
       - topic_watchdog.exe
       - gemini_processor.exe
-  # Seed SCLFolder DBs — copied to userData on first launch by scl-folder.ts so
-  # Insights/Dashboard show real data before the user runs their first scan.
+  # SCL_Demo data-root seed — copied to <userData>/scl_data/db_files/ on first
+  # launch by scl-folder.ts. The supervisor sets SCL_DEMO_DATA_ROOT to that
+  # path so the Python workers' resolver short-circuits to it instead of
+  # walking up from sys.executable looking for an ancestor with a db_files/
+  # subdir (which won't exist in the install layout).
+  #
+  # Bundle includes the worker-required config + privacy lists + the seed
+  # SCLFolder DBs. Runtime swarm/peer state (CStat.db, mq.db, swarm.db, etc.)
+  # is NOT bundled — workers create those on first run.
   - from: ../../../SCL_Demo/db_files
-    to: scl_db_seed
+    to: scl_data_seed/db_files
     filter:
+      - config.json
+      - Support_priv_list.json
+      - Ignore_publ_list.json
+      - zine_mappings.json
       - SCLFolder_Publ.db
       - SCLFolder_Priv.db
+  # Vendored decentralised-stack binaries. Fetched + extracted on demand by
+  # scripts/fetch-vendor-binaries.mjs (the build:win script chains through it
+  # automatically). IPFS Kubo provides the content-addressed P2P transport for
+  # peer file sharing; Nginx is the reverse proxy that the ExecEngine HTTP/
+  # FastAPI consumer-peer layer will sit behind. Both are bundled now even
+  # though the runtime features that consume them aren't fully wired — the
+  # architecture is decentralised-by-design and the installer is the right
+  # place to land them so v2 features ship without a second installer round.
+  - from: vendor/ipfs
+    to: extras/ipfs
+    filter: ['**/*']
+  - from: vendor/nginx
+    to: extras/nginx
+    filter: ['**/*']
 
 asarUnpack:
   - resources/**
@@ -45,6 +70,12 @@ win:
       arch: [x64]
   icon: resources/icon.ico
   artifactName: ${productName}-Setup-${version}.${ext}
+  signtoolOptions:
+    # Surfaces in Windows SmartScreen + Properties → Details. Cleaner UX than
+    # "Unknown publisher" even though the binary remains unsigned. A real
+    # code-signing certificate is the only way to remove the SmartScreen warning
+    # entirely; deferred until that's purchased.
+    publisherName: ShortCut Studio
 
 nsis:
   oneClick: false
@@ -54,6 +85,9 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: ShortCut Studio
+  # Custom NSIS hooks: post-install prompt to open optional LLM tool download
+  # pages (Ollama, LM Studio). See build/installer.nsh for the macro.
+  include: build/installer.nsh
 
 publish:
   provider: generic

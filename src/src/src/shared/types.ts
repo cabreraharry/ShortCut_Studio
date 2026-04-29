@@ -114,6 +114,8 @@ export type ClassifierProvider =
   | 'openai'
   | 'gemini'
   | 'ollama'
+  | 'huggingface'
+  | 'lmstudio'
   | 'mock'
   | 'clipboard'
 
@@ -295,6 +297,20 @@ export interface LlmDiscoverResult {
   models?: string[]
   /** True when the provider has no /models endpoint and we used a hardcoded fallback list. */
   fallback?: boolean
+  error?: string
+}
+
+// ---------- OpenAI inline usage fetch ----------
+//
+// One-off pull of today's spend from OpenAI's undocumented `/v1/usage` endpoint
+// using the user's existing API key. Hidden gracefully on any failure — the
+// dashboard-link button is the primary surface, the inline number is bonus
+// polish for the only provider that exposes a usable usage API.
+
+export interface LlmOpenAiUsageResult {
+  ok: boolean
+  /** USD spent today (UTC day boundary, matches OpenAI billing). */
+  usdToday?: number
   error?: string
 }
 

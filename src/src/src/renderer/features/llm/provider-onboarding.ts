@@ -115,5 +115,53 @@ export const PROVIDER_GUIDES: Record<string, ProviderGuide> = {
       }
     ],
     keyPlaceholder: '(no key required)'
+  },
+  HuggingFace: {
+    providerName: 'Hugging Face (Inference Providers)',
+    intro:
+      "Hugging Face's Inference Providers route a single token to many open-source models hosted across multiple inference partners. Free tier available; pay-as-you-go for higher rate limits. Tokens start with 'hf_'.",
+    steps: [
+      {
+        title: 'Create a Hugging Face account',
+        body: 'Sign up (or sign in) at huggingface.co.',
+        link: { label: 'huggingface.co/join', url: 'https://huggingface.co/join' }
+      },
+      {
+        title: 'Create an access token',
+        body: "Go to Settings → Access Tokens and click 'New token'. Choose 'Read' or a fine-grained token with 'Make calls to Inference Providers' enabled. Copy it once — you won't see it again.",
+        link: { label: 'Access tokens', url: 'https://huggingface.co/settings/tokens' }
+      },
+      {
+        title: 'Paste the token below',
+        body: 'Paste into the HuggingFace row. Stored locally in your SQLite DB. Click Test to confirm, then Refresh models to populate the model list.'
+      }
+    ],
+    keyFormat: 'hf_... (typically 37+ characters)',
+    keyPlaceholder: 'hf_...'
+  },
+  'LM Studio': {
+    providerName: 'LM Studio (local)',
+    intro:
+      "LM Studio is a desktop app that runs open-source LLMs locally and exposes an OpenAI-compatible server. Like Ollama, no API key, no usage fees, full privacy — just download the app, load a model, and start the server.",
+    steps: [
+      {
+        title: 'Install LM Studio',
+        body: 'Download the Windows installer from lmstudio.ai. After install, launch the app.',
+        link: { label: 'lmstudio.ai', url: 'https://lmstudio.ai/' }
+      },
+      {
+        title: 'Download a model',
+        body: 'In LM Studio, open the Discover tab and download a model (e.g. Llama 3.2 3B Instruct). Smaller models load faster but are less capable.'
+      },
+      {
+        title: 'Start the local server',
+        body: "Open the Developer tab (or Local Server tab depending on version), load your model, and click 'Start Server'. The default port is 1234."
+      },
+      {
+        title: 'Verify LM Studio is running',
+        body: "Click 'Test connection' in the LM Studio row. If ✓, click 'Refresh models' to populate the loaded model. If ✗, ensure the LM Studio server is running on http://localhost:1234."
+      }
+    ],
+    keyPlaceholder: '(no key required)'
   }
 }

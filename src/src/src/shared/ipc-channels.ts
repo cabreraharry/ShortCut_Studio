@@ -32,6 +32,7 @@ export const IpcChannel = {
   LlmTestConnection: 'llm:test-connection',
   LlmDiscoverModels: 'llm:discover-models',
   LlmComplete: 'llm:complete',
+  LlmFetchOpenAiUsage: 'llm:fetch-openai-usage',
 
   // Admin settings
   SettingsGet: 'settings:get',

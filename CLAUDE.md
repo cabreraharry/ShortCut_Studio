@@ -13,7 +13,7 @@ Minimum reading order: `docs/claude-handoff/README.md` → `01-conversation-log.
 **ShortCut Studio** — the unified client-side UI for the SCL document-processing ecosystem. A Windows-first Electron desktop app that gives researchers / academics one place to:
 
 - Pick which folders to scan for eBooks (PDF, EPUB, MOBI)
-- Configure LLM providers and API keys (Ollama, OpenAI, Claude, Gemini)
+- Configure LLM providers and API keys (Ollama, OpenAI, Claude, Gemini, HuggingFace, LM Studio)
 - Browse topics + trigger topic generation + review AI suggestions
 - Monitor progress (local + community peers) via the **Progress Glass**
 - Manage IPFS allocation for peer-shared processing *(stubbed in v1)*
@@ -155,7 +155,11 @@ Real CP-protocol wiring of the remaining methods lands in v2 once ExecEngine shi
 Background processing (scan, watchdog, topic generation) lives in **SCL_Demo** (`D:/Client-Side_Project/SCL_Demo/`) as PyInstaller `.exes`:
 `filescanner`, `rescan`, `root_watchdog`, `topic_watchdog`, `gemini_processor`, `postprocessing`.
 
-The Electron main process's `workers/supervisor.ts` spawns + supervises these. Each `.exe` exposes a small FastAPI HTTP interface (via the shared `SCL_Demo/tools/worker_api.py` module — adopted in source 2026-04-28; rebuild blocked on venv deps, see `docs/claude-handoff/06-pending-and-caveats.md` item 1) on a localhost port from the `WORKER_HEALTH_PORT` env var so the main process can query `/health` + `/status` instead of parsing stdout.
+The Electron main process's `workers/supervisor.ts` spawns + supervises these. Each `.exe` exposes a small FastAPI HTTP interface (via the shared `SCL_Demo/tools/worker_api.py` module) on a localhost port from the `WORKER_HEALTH_PORT` env var so the main process can query `/health` + `/status` instead of parsing stdout.
+
+**LLM bridge (added v0.4.0):** [src/main/llm/bridgeServer.ts](src/src/src/main/llm/bridgeServer.ts) starts a loopback HTTP server on `127.0.0.1:45123` exposing `POST /llm/complete`. The supervisor passes `ELECTRON_LLM_BRIDGE_PORT=45123` in spawned workers' env. Workers POST chat-completion requests via [SCL_Demo/tools/electron_llm_client.py](D:/Client-Side_Project/SCL_Demo/tools/electron_llm_client.py); the bridge wraps the existing `complete()` dispatcher so workers always use whichever provider the user has selected in the GUI. No API keys in worker process memory.
+
+**Packaged-mode data root:** the supervisor also sets `SCL_DEMO_DATA_ROOT=<userData>/scl_data` for spawned workers in packaged builds. The bundled `resources/scl_data_seed/db_files/` is copied to that location on first launch (see `db/scl-folder.ts::seedDataRootIfNeeded`). The Python workers' resolver short-circuits to that env var instead of walking up from `sys.executable` looking for an ancestor `db_files/` (which doesn't exist in the install layout).
 
 Auto-restart on crash with backoff; visible in the **Diagnostics** panel in Settings.
 
@@ -181,7 +185,7 @@ Conventions: boolean-ish fields remain `VARCHAR` holding `'Y'` / `'N'` (carried 
 
 **Never expose sqlite3 to the renderer.** All reads/writes flow through IPC handlers.
 
-Pre-seeded LLM providers: Ollama (default), OpenAI, Claude, Gemini.
+Pre-seeded LLM providers: Ollama (default, local), OpenAI, Claude, Gemini, HuggingFace, LM Studio (local). HuggingFace + LM Studio added in v0.4.0; the `LLM_Budgets` table from a brief mid-development experiment is dropped on migration. The single source of truth for "is this provider local?" is [@shared/providers.ts::LOCAL_PROVIDER_NAMES](src/src/src/shared/providers.ts) — used by both the dispatcher's no-key-required exemption and the renderer's "Local" badge.
 
 ### Public / Private mode
 
@@ -220,9 +224,17 @@ When touching these, fix the root rather than working around it:
 2. **Existing `loc_adm.db` was seeded with VARCHAR(50) columns** — migrations don't change stored rows, just add missing tables. SQLite treats VARCHAR as TEXT at runtime, so practical width is unlimited; the constraint is cosmetic.
 3. **Info Section messages are placeholders** until the owner supplies real copy. Stored in `resources/info-messages.json` when that lands — for now inlined in `InfoSection.tsx`.
 4. **Progress Glass peer data is synthetic** — `RealLocalExecEngineClient` reads real local counts from SCLFolder, but peer counts stay 0 (and range deltas/ETA stay synthetic) until ExecEngine's HTTP layer ships. Swap point: `realLocal.ts::getProgressSummary`.
-5. **Worker supervisor spawns are real, but the .exes themselves crash on launch** until SCL_Demo's `.venv` is fully populated. Python source has adopted `worker_api.py`, build scripts use `python -m PyInstaller`, but rebuilds error on missing deps (`psutil` etc.) — see `docs/claude-handoff/06-pending-and-caveats.md` item 1 for the unblock recipe.
+5. **Worker .exes now build and run.** As of 2026-04-29, all three (`root_watchdog`, `topic_watchdog`, `gemini_processor`) build cleanly and serve `/health` + `/status` on ports 19001/19002/19003. SCL_Demo's `.venv` had a `psutil` gap (since fixed) and the bundled .exes had a runtime path-resolution bug (since fixed via `tools/utils_paths.py` resolver + frozen-detect). See `docs/claude-handoff/06-pending-and-caveats.md` item 1 for the full story.
 6. **Insights / Folder Health / Knowledge Map / Filters preview are now REAL** (was 100% mock until 2026-04-28). All read from `SCLFolder_{Publ,Priv}.db` via `src/main/db/scl-folder.ts`. Empty / zero fallbacks when no scan has run.
-7. **LLM model auto-discovery + auth-validating test-connection** (added 2026-04-28). New IPC channel `llm:discover-models` calls `Ollama /api/tags`, `OpenAI /v1/models`, `Claude /v1/models`, `Gemini /v1beta/models` and re-populates the `Models` table. `LlmTestConnection` is now a thin wrapper around discovery — auth-passes-iff-discovery-succeeds.
+7. **LLM model auto-discovery + auth-validating test-connection** (added 2026-04-28). New IPC channel `llm:discover-models` calls `Ollama /api/tags`, `OpenAI /v1/models`, `Claude /v1/models`, `Gemini /v1beta/models`, plus (added 2026-04-29) `HuggingFace whoami-v2 + curated fallback list`, `LM Studio /v1/models`. `LlmTestConnection` is a thin wrapper around discovery — auth-passes-iff-discovery-succeeds.
+
+8. **LLM bridge for Python workers** (added 2026-04-29 in v0.4.0). [src/main/llm/bridgeServer.ts](src/src/src/main/llm/bridgeServer.ts) starts a loopback HTTP server on `127.0.0.1:45123` that exposes `POST /llm/complete` — a thin wrapper around the existing `complete()` dispatcher. SCL_Demo's `gemini_processor` worker no longer holds Gemini-specific credentials; it POSTs chat-completion requests to the bridge via [SCL_Demo/tools/electron_llm_client.py](D:/Client-Side_Project/SCL_Demo/tools/electron_llm_client.py). The supervisor passes `ELECTRON_LLM_BRIDGE_PORT=45123` in the spawned worker's env. The user's GUI provider choice now actually drives scan-time topic naming.
+
+9. **Per-provider "Open usage dashboard" links + OpenAI inline spend** (replaced the brief soft-warn budget feature, 2026-04-29). Each cloud-provider card on the LLMs page has an "Open usage dashboard" button that opens the provider's billing page via `app.openExternal`. OpenAI's card additionally shows today's USD spend inline by hitting `/v1/usage` (undocumented but functional; defensive parsing; hides on any error). The earlier `LLM_Budgets` table is dropped on migration.
+
+10. **Packaged-mode worker data root** (added 2026-04-29 in v0.4.0). The supervisor sets `SCL_DEMO_DATA_ROOT=<userData>/scl_data` for spawned workers in packaged builds. The bundled `resources/scl_data_seed/db_files/` is copied to that location on first launch by [scl-folder.ts::seedDataRootIfNeeded](src/src/src/main/db/scl-folder.ts). v0.3.x users get a one-time migration from the old `<userData>/scl_db_files/` layout.
+
+11. **Installer bundles IPFS Kubo + Nginx** (added 2026-04-29 in v0.4.0). Vendored under `src/src/vendor/{ipfs,nginx}/` (gitignored, fetched by [scripts/fetch-vendor-binaries.mjs](src/src/scripts/fetch-vendor-binaries.mjs) on `build:win`/`build:unpack`). Lands at `resources/extras/{ipfs,nginx}/` in the installed app. Currently dormant — IPFS allocation feature and ExecEngine HTTP/Nginx layer ship in v2.
 
 ## Working with This Repo
 

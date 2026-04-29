@@ -134,6 +134,77 @@ async function discoverClaude(input: DiscoverInput): Promise<DiscoveredModels> {
   return { models, defaultModel }
 }
 
+// Curated list of widely-available HuggingFace Inference Provider models. Used
+// as a fallback when the router's `/v1/models` endpoint isn't enumerable for
+// the user's account (the router accepts these IDs in chat-completions calls
+// regardless of whether the listing is exposed).
+const HF_FALLBACK_MODELS = [
+  'meta-llama/Llama-3.3-70B-Instruct',
+  'meta-llama/Meta-Llama-3.1-70B-Instruct',
+  'meta-llama/Meta-Llama-3.1-8B-Instruct',
+  'mistralai/Mistral-7B-Instruct-v0.3',
+  'mistralai/Mixtral-8x7B-Instruct-v0.1',
+  'Qwen/Qwen2.5-72B-Instruct',
+  'Qwen/Qwen2.5-7B-Instruct',
+  'google/gemma-2-9b-it',
+  'google/gemma-2-27b-it',
+  'microsoft/Phi-3.5-mini-instruct'
+]
+
+async function discoverHuggingFace(input: DiscoverInput): Promise<DiscoveredModels> {
+  if (!input.apiKey) throw new AuthFailedError('HuggingFace: missing API token')
+  const host = trimHost(input.apiHost) || 'https://router.huggingface.co/v1'
+  // Use the auth-only `whoami` endpoint to validate the token. The router's
+  // `/v1/models` listing isn't reliably populated for every account, so we
+  // validate auth here and serve a curated fallback for the model picker.
+  // Users can add specific model IDs via the "Add model" input if they need
+  // one outside the curated set (AllowAddModel='Y' in the seed).
+  const auth = await rawFetch({
+    url: 'https://huggingface.co/api/whoami-v2',
+    method: 'GET',
+    headers: { Authorization: `Bearer ${input.apiKey}` }
+  })
+  if (auth.status === 401 || auth.status === 403) {
+    throw new AuthFailedError('HuggingFace: auth failed')
+  }
+  if (auth.status >= 400 && auth.status !== 404) {
+    throw new Error(`HuggingFace HTTP ${auth.status}: ${auth.body.slice(0, 200)}`)
+  }
+  // Try the OpenAI-compatible listing first; if it returns useful rows, use
+  // them. Otherwise fall back to the curated list. Either path constitutes a
+  // successful auth-validation since whoami already passed.
+  let liveModels: string[] = []
+  try {
+    const r = await rawFetch({
+      url: `${host}/models`,
+      method: 'GET',
+      headers: { Authorization: `Bearer ${input.apiKey}` }
+    })
+    if (r.status >= 200 && r.status < 300) {
+      const parsed = JSON.parse(r.body) as { data?: Array<{ id: string }> }
+      liveModels = (parsed.data ?? []).map((m) => m.id).filter(Boolean)
+    }
+  } catch {
+    // Listing endpoint absent or returned non-JSON — fall through to curated.
+  }
+  const models = liveModels.length > 0 ? liveModels.sort().slice(0, 50) : HF_FALLBACK_MODELS
+  const defaultModel =
+    models.find((m) => /Llama-3\.3-70B-Instruct/i.test(m)) ??
+    models.find((m) => /Llama-3/i.test(m)) ??
+    models[0]
+  return { models, defaultModel, fallback: liveModels.length === 0 }
+}
+
+async function discoverLmStudio(input: DiscoverInput): Promise<DiscoveredModels> {
+  const host = trimHost(input.apiHost) || 'http://localhost:1234/v1'
+  const r = await rawFetch({ url: `${host}/models`, method: 'GET' })
+  if (r.status === 0) throw new Error('LM Studio unreachable — is the local server running?')
+  if (r.status >= 400) throw new Error(`LM Studio HTTP ${r.status}: ${r.body.slice(0, 200)}`)
+  const parsed = JSON.parse(r.body) as { data?: Array<{ id: string }> }
+  const models = (parsed.data ?? []).map((m) => m.id).filter(Boolean)
+  return { models, defaultModel: models[0] }
+}
+
 async function discoverGemini(input: DiscoverInput): Promise<DiscoveredModels> {
   if (!input.apiKey) throw new AuthFailedError('Gemini: missing API key')
   const host = trimHost(input.apiHost) || 'https://generativelanguage.googleapis.com'
@@ -170,6 +241,11 @@ export async function discoverModels(input: DiscoverInput): Promise<DiscoveredMo
     case 'gemini':
     case 'google':
       return discoverGemini(input)
+    case 'huggingface':
+      return discoverHuggingFace(input)
+    case 'lm studio':
+    case 'lmstudio':
+      return discoverLmStudio(input)
     default:
       throw new Error(`Unknown provider for model discovery: ${input.providerName}`)
   }

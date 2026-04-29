@@ -38,6 +38,7 @@ import type {
   LlmCompleteResult,
   LlmDiscoverResult,
   LlmModel,
+  LlmOpenAiUsageResult,
   LlmProvider,
   LlmTestResult,
   PrivacyTerm,
@@ -93,6 +94,7 @@ export interface ElectronAPI {
     testConnection: (providerId: number) => Promise<LlmTestResult>
     discoverModels: (providerId: number) => Promise<LlmDiscoverResult>
     complete: (req: LlmCompleteRequest) => Promise<LlmCompleteResult>
+    fetchOpenAiUsage: (providerId: number) => Promise<LlmOpenAiUsageResult>
   }
   settings: {
     get: () => Promise<AppSettings>

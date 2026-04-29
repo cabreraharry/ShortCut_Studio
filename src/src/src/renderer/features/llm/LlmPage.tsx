@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Eye,
   EyeOff,
+  ExternalLink,
   Info,
   HelpCircle,
   Check,
@@ -23,6 +24,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { OnboardingDialog } from './OnboardingDialog'
 import { PROVIDER_GUIDES, type ProviderGuide } from './provider-onboarding'
 import { ProviderHub } from '@/components/visual/ProviderHub'
+import { isLocalProvider } from '@shared/providers'
+import { USAGE_DASHBOARD_URL } from './dashboard-urls'
+import { OpenAiUsageInline } from './OpenAiUsageInline'
 
 const BRAND: Record<
   string,
@@ -32,6 +36,8 @@ const BRAND: Record<
   OpenAI: { solid: '#10A37F', tint: 'rgba(16, 163, 127, 0.15)', initial: 'O' },
   Claude: { solid: '#D97757', tint: 'rgba(217, 119, 87, 0.15)', initial: 'C' },
   Gemini: { solid: '#4285F4', tint: 'rgba(66, 133, 244, 0.15)', initial: 'G' },
+  HuggingFace: { solid: '#FF9D00', tint: 'rgba(255, 157, 0, 0.15)', initial: 'H' },
+  'LM Studio': { solid: '#0EA5E9', tint: 'rgba(14, 165, 233, 0.15)', initial: 'L' },
   Default: { solid: '#6366F1', tint: 'rgba(99, 102, 241, 0.12)', initial: '?' }
 }
 
@@ -171,9 +177,9 @@ function ProviderCard({
 
   const guide = PROVIDER_GUIDES[provider.providerName]
   const hasKey = provider.hasApiKey === 'Y'
-  const isOllama = provider.providerName === 'Ollama'
+  const isLocal = isLocalProvider(provider.providerName)
   const brand = BRAND[provider.providerName] ?? BRAND.Default
-  const active = isOllama || hasKey
+  const active = isLocal || hasKey
 
   return (
     <div
@@ -205,13 +211,13 @@ function ProviderCard({
               </TooltipContent>
             </Tooltip>
           )}
-          {isOllama ? (
+          {isLocal ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <span><Badge variant="secondary">Local</Badge></span>
               </TooltipTrigger>
               <TooltipContent className="max-w-xs">
-                Runs entirely on your PC. Nothing leaves the machine. No API key required — just install Ollama and start the daemon.
+                Runs entirely on your PC. Nothing leaves the machine. No API key required — just start the local server.
               </TooltipContent>
             </Tooltip>
           ) : hasKey ? (
@@ -251,7 +257,7 @@ function ProviderCard({
         Host: <span className="font-mono">{provider.apiHost || '—'}</span>
       </p>
 
-      {!isOllama && (
+      {!isLocal && (
         <div className="mt-3 flex items-center gap-2">
           <div className="relative flex-1">
             <Input
@@ -300,10 +306,10 @@ function ProviderCard({
           </Button>
         </div>
       )}
-      {isOllama && (
+      {isLocal && (
         <div className="mt-3 flex items-center gap-2">
           <p className="flex-1 text-xs text-muted-foreground">
-            No key required. Make sure the Ollama service is running on{' '}
+            No key required. Make sure the {provider.providerName} service is running on{' '}
             <span className="font-mono">{provider.apiHost}</span>.
           </p>
           <Button
@@ -335,6 +341,32 @@ function ProviderCard({
 
       {testResult && <TestResultLine result={testResult} />}
       {discoverResult && <DiscoverResultLine result={discoverResult} />}
+      <UsageRow provider={provider} />
+    </div>
+  )
+}
+
+function UsageRow({ provider }: { provider: LlmProvider }): JSX.Element | null {
+  // Local providers run on the user's own machine — no remote billing to
+  // visit. Skip the row entirely. Cloud providers get the dashboard link
+  // unconditionally (lets the user log in / verify account state even when
+  // no key is configured yet).
+  if (isLocalProvider(provider.providerName)) return null
+  const url = USAGE_DASHBOARD_URL[provider.providerName]
+  if (!url) return null
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => window.electronAPI.app.openExternal(url)}
+        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline"
+      >
+        <ExternalLink className="h-3 w-3" />
+        Open usage dashboard
+      </button>
+      {provider.providerName === 'OpenAI' && provider.hasApiKey === 'Y' && (
+        <OpenAiUsageInline providerId={provider.providerId} />
+      )}
     </div>
   )
 }

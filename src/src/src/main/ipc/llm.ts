@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { ipcMain, net } from 'electron'
 import { IpcChannel } from '@shared/ipc-channels'
 import { getLocAdmDb } from '../db/connection'
 import { AuthFailedError, discoverModels } from '../llm/modelDiscovery'
@@ -8,6 +8,7 @@ import type {
   LlmCompleteResult,
   LlmDiscoverResult,
   LlmModel,
+  LlmOpenAiUsageResult,
   LlmProvider,
   LlmTestResult
 } from '@shared/types'
@@ -211,6 +212,90 @@ export function registerLlmHandlers(): void {
     IpcChannel.LlmComplete,
     async (_evt, req: LlmCompleteRequest): Promise<LlmCompleteResult> => {
       return complete(req)
+    }
+  )
+
+  // OpenAI inline usage fetch — pulls today's USD spend from the
+  // undocumented `/v1/usage` endpoint using the user's existing API key.
+  // The renderer hides the inline display gracefully on any failure (auth
+  // error, endpoint changed shape, network down) so the dashboard-link
+  // fallback always remains. UTC date matches OpenAI's billing day boundary.
+  ipcMain.handle(
+    IpcChannel.LlmFetchOpenAiUsage,
+    async (_evt, providerId: number): Promise<LlmOpenAiUsageResult> => {
+      const db = getLocAdmDb()
+      const provider = db
+        .prepare(
+          'SELECT Provider_Name, API_Key, API_Host FROM LLM_Provider WHERE Provider_ID = ?'
+        )
+        .get(providerId) as
+        | { Provider_Name: string; API_Key: string; API_Host: string }
+        | undefined
+      if (!provider) return { ok: false, error: 'Provider not found' }
+      if (provider.Provider_Name !== 'OpenAI') {
+        return { ok: false, error: 'Usage fetch only supported for OpenAI' }
+      }
+      if (!provider.API_Key) return { ok: false, error: 'No API key set' }
+
+      // UTC YYYY-MM-DD — OpenAI's billing day boundary.
+      const today = new Date()
+      const date = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, '0')}-${String(today.getUTCDate()).padStart(2, '0')}`
+      const host = (provider.API_Host || 'https://api.openai.com').replace(/\/+$/, '')
+
+      try {
+        const body = await new Promise<string>((resolve, reject) => {
+          const req = net.request({
+            method: 'GET',
+            url: `${host}/v1/usage?date=${date}`
+          })
+          req.setHeader('Authorization', `Bearer ${provider.API_Key}`)
+          const chunks: Buffer[] = []
+          req.on('response', (res) => {
+            res.on('data', (c) => chunks.push(c as Buffer))
+            res.on('end', () => {
+              const text = Buffer.concat(chunks).toString('utf8')
+              if ((res.statusCode ?? 0) >= 400) {
+                reject(new Error(`HTTP ${res.statusCode}: ${text.slice(0, 200)}`))
+                return
+              }
+              resolve(text)
+            })
+            res.on('error', reject)
+          })
+          req.on('error', reject)
+          req.end()
+        })
+
+        // Tolerant parse: OpenAI's `/v1/usage` shape has shifted across years.
+        // Try `total_usage` (cents) first; that's the canonical aggregate when
+        // present and a 0 there is a legitimate "no activity today". Only fall
+        // back to summing `data[].cost` when the array is non-empty — an empty
+        // `data: []` with no `total_usage` field is too ambiguous (could be
+        // genuine zero, could be an endpoint shape we don't recognise), so we
+        // hide the inline display rather than confidently showing $0.00.
+        const parsed = JSON.parse(body) as {
+          total_usage?: number
+          data?: Array<{ cost?: number }>
+        }
+        let cents: number | undefined
+        if (typeof parsed.total_usage === 'number') {
+          cents = parsed.total_usage
+        } else if (Array.isArray(parsed.data) && parsed.data.length > 0) {
+          cents = parsed.data.reduce(
+            (sum, d) => sum + (typeof d.cost === 'number' ? d.cost : 0),
+            0
+          )
+        }
+        if (cents === undefined || !Number.isFinite(cents)) {
+          return { ok: false, error: 'Unexpected response shape' }
+        }
+        return { ok: true, usdToday: cents / 100 }
+      } catch (err) {
+        return {
+          ok: false,
+          error: err instanceof Error ? err.message : String(err)
+        }
+      }
     }
   )
 }

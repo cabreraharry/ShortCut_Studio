@@ -187,6 +187,8 @@ FileTypeFilters(extension TEXT PK, label, enabled 0|1, sortOrder)
 ### User-data path resolution (production)
 In dev, `loc_adm.db` lives in the repo at `src/src/db_files/loc_adm.db`. In a packaged build, `connection.ts::locAdmDbPath` uses `app.getPath('userData')/db_files/loc_adm.db` and copies the bundled seed (from `process.resourcesPath/db_files/loc_adm.db`) on first launch. Upgrades don't clobber user state.
 
+**SCL_Demo data root (v0.4.0):** the Python workers expect a `db_files/` subdirectory containing `config.json`, ignore lists, and the SCLFolder DBs. In packaged builds, that lives at `<userData>/scl_data/db_files/`, seeded from `process.resourcesPath/scl_data_seed/db_files/` on first launch. The supervisor passes `SCL_DEMO_DATA_ROOT=<userData>/scl_data` to spawned workers' env so the Python resolver short-circuits to that path. v0.3.x users get a one-time migration from the old `<userData>/scl_db_files/` layout.
+
 ## Worker supervisor
 
 ### What's supervised
@@ -211,11 +213,14 @@ One-shot workers (`filescanner`, `rescan`, `postprocessing`) are spawned on dema
 ### Lifecycle
 
 For each configured worker:
-1. `spawn` with `WORKER_HEALTH_PORT` env var injected
+1. `spawn` with three env vars injected:
+   - `WORKER_HEALTH_PORT` — port for `/health` + `/status` (19001/19002/19003)
+   - `ELECTRON_LLM_BRIDGE_PORT=45123` (v0.4.0) — workers POST chat-completion requests to Electron's loopback bridge instead of holding provider API keys themselves
+   - `SCL_DEMO_DATA_ROOT=<userData>/scl_data` (v0.4.0, packaged builds only) — tells the Python resolver where to find `db_files/` instead of walking up from `sys.executable`
 2. Capture stdout + stderr into a per-worker ring buffer (400 lines)
 3. On exit with non-zero code, schedule restart with `2_000 * 2^n` ms backoff (capped at 30 s, max 5 attempts)
 4. Every 10 s, `pingHealth` hits `http://127.0.0.1:<port>/health`
-5. Worker process death (detected via `exit` event) is authoritative — `pingHealth` failure alone does NOT mark a worker crashed (the worker may simply not have adopted the FastAPI wrapper yet)
+5. Worker process death (detected via `exit` event) is authoritative — `pingHealth` failure alone does NOT mark a worker crashed
 
 ### FastAPI wrapper module
 

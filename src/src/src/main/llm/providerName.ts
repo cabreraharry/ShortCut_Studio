@@ -14,7 +14,9 @@ export const PROVIDER_NAME_BY_CODE: Record<string, ClassifierProvider> = {
   Claude: 'claude',
   OpenAI: 'openai',
   Gemini: 'gemini',
-  Ollama: 'ollama'
+  Ollama: 'ollama',
+  HuggingFace: 'huggingface',
+  'LM Studio': 'lmstudio'
 }
 
 export function providerCodeFromName(name: string): ClassifierProvider | null {

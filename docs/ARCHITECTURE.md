@@ -343,7 +343,12 @@ AdminData(
 -- User-configured scan roots
 Folder(ID PK, Path TEXT, Include 'Y'|'N', ProcRound, LastUpd_CT)
 
--- LLM provider config (4 seeded: Ollama, OpenAI, Claude, Gemini)
+-- LLM provider config (6 seeded as of v0.4.0: Ollama, OpenAI, Claude, Gemini,
+-- HuggingFace, LM Studio). The single source of truth for "is this provider
+-- local?" is @shared/providers.ts::LOCAL_PROVIDER_NAMES — used by both the
+-- dispatcher's no-key-required exemption and the renderer's "Local" badge.
+-- A v0.3.x → v0.4.x migration canonicalises any 'Claude, Anthropic' rows
+-- back to 'Claude' so the dispatcher's name-to-code map resolves cleanly.
 LLM_Provider(Provider_ID PK, Provider_Name, Has_API_Key, API_Key TEXT,
              API_Host, IsDefault, Supported, AllowAddModel)
 
@@ -426,11 +431,19 @@ locAdmDbPath() in connection.ts:
   if packaged:   app.getPath('userData')/db_files/loc_adm.db
                   ↑ first launch: copies from process.resourcesPath/db_files/loc_adm.db
 
-sclDbDir() in scl-folder.ts:
+sclDbDir() in scl-folder.ts:                              -- v0.4.0 layout
   env override:  process.env.SCL_DEMO_DB_DIR
   if dev:        D:/Client-Side_Project/SCL_Demo/db_files
-  if packaged:   app.getPath('userData')/scl_db_files
-                  ↑ first launch: copies from process.resourcesPath/scl_db_seed/
+  if packaged:   app.getPath('userData')/scl_data/db_files/
+                  ↑ first launch: copies from process.resourcesPath/scl_data_seed/db_files/
+                  ↑ v0.3.x users: one-time migration from <userData>/scl_db_files/
+                  ↑ supervisor sets SCL_DEMO_DATA_ROOT=<userData>/scl_data
+                    in spawned-worker env so the Python resolver short-circuits
+
+sclDataRootDir() in scl-folder.ts:                        -- v0.4.0 helper
+  always:        app.getPath('userData')/scl_data
+                  ↑ contains db_files/ subdir; passed to workers as
+                    SCL_DEMO_DATA_ROOT env var by the supervisor
 ```
 
 ---
@@ -536,7 +549,11 @@ Live rule builder. AND-combined filter rules: `minPages / maxPages / filenameInc
 
 ### LLMs (`/llm`)
 
-Provider cards for Ollama / OpenAI / Claude / Gemini. Each card has an API key input (with show/hide), Test button (auth-validating via discovery), Refresh-models button (calls `/models` and repopulates the `Models` table), and brand-coloured status badges. An OnboardingDialog walks the user through obtaining keys for each provider. PrivacyShield callout at top warning about sharing expertise with commercial LLMs.
+Provider cards for **Ollama / OpenAI / Claude / Gemini / HuggingFace / LM Studio** (last two added v0.4.0). Cloud providers show an API key input (with show/hide), Test button (auth-validating via discovery), Refresh-models button (calls `/models` and repopulates the `Models` table), and brand-coloured status badges. Local providers (Ollama, LM Studio — single source of truth in `@shared/providers.ts`) suppress the key input and show a "make sure the local server is running on \<host\>" hint instead. An OnboardingDialog walks the user through obtaining keys / installing local servers for each provider.
+
+Each cloud-provider card additionally shows an **"Open usage dashboard"** button below its status — opens the provider's billing/usage page in the browser via `app.openExternal`. URLs verified live (see `renderer/features/llm/dashboard-urls.ts`). The OpenAI card additionally shows today's USD spend inline by hitting `/v1/usage` (undocumented but functional; defensive parsing tries `total_usage` then sums `data[].cost`; hides on any failure so the dashboard link always remains as fallback).
+
+PrivacyShield callout at top warning about sharing expertise with commercial LLMs.
 
 ### Community (`/community`)
 
@@ -580,7 +597,10 @@ Hidden side panel with 7 tabs. Bypasses normal user UX:
 
 ShortCut Studio supervises three long-running workers from SCL_Demo. The supervisor in `src/main/workers/supervisor.ts` does:
 
-1. **Spawn** each `.exe` with `WORKER_HEALTH_PORT` env var injected so the worker knows which port to bind its FastAPI for `/health` + `/status`
+1. **Spawn** each `.exe` with three env vars injected:
+   - `WORKER_HEALTH_PORT` — port for the worker's FastAPI `/health` + `/status` server (19001/19002/19003).
+   - `ELECTRON_LLM_BRIDGE_PORT` — `45123`. Tells workers where to POST chat-completion requests so the user's GUI provider choice drives scan-time topic naming. Workers no longer hold provider API keys themselves. (See §10 → "LLM bridge for workers".)
+   - `SCL_DEMO_DATA_ROOT` — packaged builds only. Set to `<userData>/scl_data`. The Python workers' resolver short-circuits to this path instead of walking up from `sys.executable` looking for an ancestor `db_files/`.
 2. **Capture stdout + stderr** into a per-worker ring buffer (last 400 lines) for log-tail viewer
 3. **Track exit events**. On non-zero exit code, schedule a restart with exponential backoff (`2_000 * 2^n` ms, capped at 30s, max 5 attempts).
 4. **Health-poll** every 10s: `GET http://127.0.0.1:<port>/health`. Failure is non-fatal — worker may not have adopted the FastAPI wrapper yet.
@@ -605,17 +625,17 @@ ShortCut Studio supervises three long-running workers from SCL_Demo. The supervi
 
 Each worker imports and calls `start_worker_api(default_port=N, default_status={...})`. It spawns a daemon thread running uvicorn + FastAPI on `127.0.0.1:<port>`. Two endpoints: `GET /health` (uptime) and `GET /status` (the worker's status dict, mutated via `set_status(key, value)` / `update_status(patch)`).
 
-**Adoption status (2026-04-28):** `start_worker_api` calls have been added to all three Python entry points; build scripts have been updated to use `python -m PyInstaller` so the venv's interpreter is used; venv extended with `pyinstaller`, `fastapi`, `uvicorn[standard]`. The `.exe` rebuilds are still blocked on a chain of missing venv deps (next: `psutil`). Until rebuilds complete, the supervisor still spawns the old (broken) `.exes` which crash on launch — Diagnostics shows `running: false` because the process exits immediately.
+**Adoption status (2026-04-29):** all three workers build, run, and serve `/health` + `/status` cleanly. The earlier blocker had two layers (build-time missing venv deps, then a runtime path-resolution bug under PyInstaller `--onefile`). Both fixed in the SCL_Demo session of 2026-04-29 — see [docs/claude-handoff/06-pending-and-caveats.md item 1](claude-handoff/06-pending-and-caveats.md) for the full story. The new `tools/utils_paths.py::get_data_root()` resolver tries `SCL_DEMO_DATA_ROOT` env first (the supervisor sets it for packaged builds), then walks up from `sys.executable` for a `db_files/` ancestor (dev fallback), then a project-relative fallback for `python -m` runs. `keep_alive_until_signal()` keeps the FastAPI thread serving even if the primary watchdog job fails to start — so the supervisor sees a healthy-but-idle worker rather than a vanished one.
 
 ---
 
 ## 10. LLM layer
 
-Two parallel subsystems sharing some primitives:
+Three parallel subsystems sharing some primitives:
 
 ### Subsystem A — Classifier (legacy)
 
-Path: `src/main/filters/`. Used by the Filter Workbench's "Classify with AI" feature. Per-provider `ClassifierAdapter`s in `filters/providers/{ollama,openai,claude,gemini}.ts` build a fixed classifier prompt internally (`prompts.ts::buildClassifierPrompt`) and parse the response into `ClassifiedFilename[]`. Tightly coupled to the classifier flow.
+Path: `src/main/filters/`. Used by the Filter Workbench's "Classify with AI" feature. Per-provider `ClassifierAdapter`s in `filters/providers/{ollama,openai,claude,gemini,huggingface,lmstudio}.ts` (last two added v0.4.0) build a fixed classifier prompt internally (`prompts.ts::buildClassifierPrompt`) and parse the response into `ClassifiedFilename[]`. Tightly coupled to the classifier flow.
 
 ### Subsystem B — Generic completion (Round 1, 2026-04-28)
 
@@ -649,6 +669,8 @@ Flow inside the dispatcher (`completion/index.ts`):
    - **Claude**: `POST /v1/messages` with `anthropic-version: 2023-06-01`. System content lands at top-level `system` field (not in messages). `stop_reason === 'max_tokens'` → `truncated: true`.
    - **Gemini**: `POST /v1beta/models/{m}:generateContent`. System hoisted to `systemInstruction.parts[].text`. `assistant` → `model` role rewrite. `responseMimeType: 'application/json'` only when JSON requested.
    - **Ollama**: `POST /api/chat` with `stream: false`. `ECONNREFUSED` rewrapped as friendly "Ollama unreachable — is the daemon running?".
+   - **HuggingFace** (v0.4.0): `POST router.huggingface.co/v1/chat/completions`. OpenAI-compatible wire format — single HF token covers many models via the Inference Providers router. Default model `meta-llama/Llama-3.3-70B-Instruct`.
+   - **LM Studio** (v0.4.0): `POST localhost:1234/v1/chat/completions`. OpenAI-compatible. No auth (local server). `ECONNREFUSED` rewrapped as friendly "LM Studio unreachable — is the local server running?".
 6. **Log usage**: `INSERT INTO LLM_Usage` with `providerId`, `modelId`, `feature`, `tokensIn`, `tokensOut`, `latencyMs`, `ts`
 7. **Return** typed `LlmCompleteResult`. Any unexpected throw becomes `{ok: false, error}` (outer try/catch).
 
@@ -662,8 +684,23 @@ Flow inside the dispatcher (`completion/index.ts`):
 | OpenAI | `GET /v1/models` | Bearer | Filters `^(gpt-\|o1-)` |
 | Claude | `GET /v1/models` | `x-api-key` + version header | Falls back to a hardcoded list on 404 (older accounts) |
 | Gemini | `GET /v1beta/models` | `x-goog-api-key` | Filters by `supportedGenerationMethods.includes('generateContent')` |
+| HuggingFace (v0.4.0) | `GET huggingface.co/api/whoami-v2` (auth) + curated 10-model fallback | Bearer | Router doesn't expose a stable `/v1/models` listing; whoami validates the token, then we serve a curated set. `AllowAddModel='Y'` so users can paste any HF model ID manually. |
+| LM Studio (v0.4.0) | `GET localhost:1234/v1/models` | none | Returns whichever model is currently loaded in LM Studio (typically one). |
 
 `api.llm.testConnection` is now a thin wrapper around discovery (auth-passes-iff-discovery-succeeds).
+
+### Subsystem C — LLM bridge for Python workers (v0.4.0)
+
+Path: `src/main/llm/bridgeServer.ts`. A loopback `http.createServer` bound to `127.0.0.1:45123`, started at `whenReady` BEFORE the worker supervisor (so the supervisor's first spawn never races the bind syscall). Two endpoints:
+
+- `GET /health` → `{ ok: true }`
+- `POST /llm/complete` → wraps `complete()` from Subsystem B; body matches the `LlmCompleteRequest` type
+
+Body cap: 1 MiB to defend against a misbehaving local process flooding the main process before `JSON.parse`. No auth: loopback-only binding is the access boundary, equivalent to read access on the local SQLite DB. Adding a shared secret would be ceremony.
+
+The supervisor passes `ELECTRON_LLM_BRIDGE_PORT=45123` to spawned workers' env. The Python helper in [SCL_Demo/tools/electron_llm_client.py](D:/Client-Side_Project/SCL_Demo/tools/electron_llm_client.py) (uses stdlib `urllib`, no extra deps) reads that env, POSTs the request, and surfaces the result. Errors classify into `BridgeError` whose message text is parsed by the worker for retry semantics (`unreachable|timeout|connection` → tenacity retry as `NetworkError`; `rate limit|quota|429` → tenacity retry as `APIError`; everything else → fall back to `generate_fallback_metadata` for the affected file).
+
+[topics/process_data_Gemini.py](D:/Client-Side_Project/SCL_Demo/topics/process_data_Gemini.py) was rewritten in v0.4.0: imports of `google.generativeai` and `genai.configure(api_key=API_KEY)` removed, `model = genai.GenerativeModel(...)` removed, `process_record_with_ai()` and `process_records()` no longer take a `model` parameter. The user's GUI provider choice now drives scan-time topic naming. (The `gemini_processor` filename + supervisor entry stayed put — renaming would have rippled through too much.)
 
 ### Test harness
 
@@ -784,22 +821,44 @@ directories:
   output: release-builds
   buildResources: resources    # where electron-builder looks for installer-time icons
 files: [out/**/*, package.json] # what goes into app.asar
-extraResources: [...]            # what goes alongside app.asar (see above)
+extraResources:
+  - resources/icon.ico → resources/icon.ico
+  - exe/ → resources/exe/                     # SCL_Restart_PortIDs.exe + friends
+  - SCL_Demo/_exe/{root,topic,gemini}_*.exe   # the 3 supervised workers
+                                              # → resources/workers/
+  - SCL_Demo/db_files/{config.json, ignore lists, SCLFolder_Publ/Priv.db, zine_mappings.json}
+                                              # → resources/scl_data_seed/db_files/
+                                              # (v0.4.0: copied to <userData>/scl_data/db_files/ on first launch)
+  - vendor/ipfs/ → resources/extras/ipfs/     # v0.4.0: IPFS Kubo v0.41.0 (~41 MB)
+  - vendor/nginx/ → resources/extras/nginx/   # v0.4.0: Nginx 1.26.2 (~2 MB)
 asarUnpack: [resources/**, node_modules/better-sqlite3/**]
                                  # native module needs to be on real FS, not inside asar
 win:
   target: [nsis]
   icon: resources/icon.ico
+  signtoolOptions:
+    publisherName: ShortCut Studio   # v0.4.0: cleaner SmartScreen UX, still unsigned
 nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
+  include: build/installer.nsh    # v0.4.0: customFinish hook (see below)
 ```
+
+### Vendored binaries (v0.4.0)
+
+`vendor/{ipfs,nginx}/` is gitignored. Populated by [scripts/fetch-vendor-binaries.mjs](../src/src/scripts/fetch-vendor-binaries.mjs) which runs as the first step of `npm run build:win` (and `build:unpack`). Idempotent: skips re-download/extract if the on-disk `VERSION` sentinel matches the script's pinned version. Bump the IPFS / Nginx version constant in that script to refresh.
+
+Currently dormant in the running app — IPFS allocation feature and ExecEngine HTTP/Nginx layer light them up in v2.
+
+### Custom NSIS hook (v0.4.0)
+
+[build/installer.nsh](../src/src/build/installer.nsh) defines a single `customFinish` macro: at end of install, MessageBox MB_YESNO asks the user whether to open download pages for Ollama / LM Studio. `/SD IDNO` makes silent installs (`Setup.exe /S`) default to "No" so unattended installs don't pop browser tabs. Yes opens both URLs via `ExecShell "open"`. The label is uniquified with `${__LINE__}` so it can't collide with future electron-builder template labels.
 
 ### Installer output
 
-- `release-builds/ShortCut Studio-Setup-<ver>.exe` — NSIS installer (~180 MB)
+- `release-builds/ShortCut Studio-Setup-<ver>.exe` — NSIS installer. v0.4.0: ~237 MB (was ~180 MB at v0.3.1; +49 MB for IPFS + Nginx + new code)
 - `release-builds/win-unpacked/ShortCut Studio.exe` — smoke-test target without installing
 - `release-builds/latest.yml` + `.blockmap` — auto-update metadata (feed URL is currently `https://example.invalid/` placeholder)
 

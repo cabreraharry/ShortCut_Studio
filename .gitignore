@@ -37,6 +37,12 @@ src/src/exe/data_log.log
 *.zip
 *.7z
 
+# Installer vendor binaries — fetched on demand by
+# src/src/scripts/fetch-vendor-binaries.mjs (IPFS Kubo, Nginx). Inner
+# .gitignore covers this for git operations rooted at src/src/, but the
+# outer entry is needed when someone runs `git add .` from the repo root.
+src/src/vendor/
+
 # OS
 .DS_Store
 Thumbs.db

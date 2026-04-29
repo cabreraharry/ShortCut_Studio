@@ -20,35 +20,93 @@ import type {
  * SCL_Demo writes scan + topic data into SCLFolder_Publ.db / SCLFolder_Priv.db.
  * The Electron client reads them — never writes (that's the scanner's job).
  *
- * Path resolution mirrors the loc_adm.db pattern in connection.ts:
- *   - dev: `SCL_DEMO_DB_DIR` env var, then sibling `SCL_Demo/db_files/`.
- *   - packaged: `app.getPath('userData')/scl_db_files/`. On first launch we
- *     copy the bundled seed from `process.resourcesPath/scl_db_seed/` so the
- *     app has something to read until the user runs a real scan.
+ * Path resolution + first-run seeding:
+ *   - dev: honour `SCL_DEMO_DB_DIR` env var, otherwise the sibling project at
+ *     `D:/Client-Side_Project/SCL_Demo/db_files/`.
+ *   - packaged: workers + client share `<userData>/scl_data/db_files/`. The
+ *     supervisor sets `SCL_DEMO_DATA_ROOT=<userData>/scl_data` for spawned
+ *     Python workers (see workers/supervisor.ts) so their resolver short-
+ *     circuits to that path instead of walking up from sys.executable looking
+ *     for a `db_files/` ancestor (which doesn't exist in the install layout).
+ *     On first launch, the bundled seed at
+ *     `process.resourcesPath/scl_data_seed/db_files/*` is copied across — see
+ *     `seedDataRootIfNeeded()`. v0.3.x users get a one-time migration from
+ *     the old `<userData>/scl_db_files/` layout.
  */
 
 const DEV_DEFAULT_DB_DIR = 'D:/Client-Side_Project/SCL_Demo/db_files'
-const SEED_FILES = ['SCLFolder_Publ.db', 'SCLFolder_Priv.db']
+const SEED_FILES = [
+  'config.json',
+  'Support_priv_list.json',
+  'Ignore_publ_list.json',
+  'zine_mappings.json',
+  'SCLFolder_Publ.db',
+  'SCLFolder_Priv.db'
+]
+
+/**
+ * Returns the per-user "data root" used by the Python workers in packaged
+ * builds. The workers expect a `db_files/` subdirectory inside this path.
+ *
+ * Available even before the seed-copy completes — the supervisor passes this
+ * value to spawned workers via `SCL_DEMO_DATA_ROOT` so worker startup waits
+ * on filesystem readiness, not on this function being called first.
+ */
+export function sclDataRootDir(): string {
+  return join(app.getPath('userData'), 'scl_data')
+}
+
+let seedAttempted = false
+
+function seedDataRootIfNeeded(): void {
+  if (seedAttempted || !app.isPackaged) return
+  seedAttempted = true
+
+  const dbFilesDir = join(sclDataRootDir(), 'db_files')
+  mkdirSync(dbFilesDir, { recursive: true })
+
+  // v0.3.x → v0.4.x migration. Old layout had only the SCLFolder DBs at
+  // <userData>/scl_db_files/. New layout is <userData>/scl_data/db_files/
+  // and includes config.json + ignore lists. Move any pre-existing files
+  // across before falling through to the bundled seed copy. No-op when
+  // the legacy dir doesn't exist (fresh installs).
+  const legacyDir = join(app.getPath('userData'), 'scl_db_files')
+  if (existsSync(legacyDir)) {
+    for (const name of SEED_FILES) {
+      const legacy = join(legacyDir, name)
+      const target = join(dbFilesDir, name)
+      if (existsSync(legacy) && !existsSync(target)) {
+        try {
+          copyFileSync(legacy, target)
+        } catch {
+          // Non-fatal — fall through to seed copy below.
+        }
+      }
+    }
+  }
+
+  // Fresh-install seed copy. Skip files that already exist (either from the
+  // v0.3.x migration above or from a prior launch of this version).
+  const seedDir = join(process.resourcesPath, 'scl_data_seed', 'db_files')
+  for (const name of SEED_FILES) {
+    const target = join(dbFilesDir, name)
+    const seed = join(seedDir, name)
+    if (!existsSync(target) && existsSync(seed)) {
+      try {
+        copyFileSync(seed, target)
+      } catch {
+        // Non-fatal: missing seed just means we open nothing until SCL_Demo
+        // produces the file. withSclFolderDb() handles the empty case.
+      }
+    }
+  }
+}
 
 function sclDbDir(): string {
   if (process.env['SCL_DEMO_DB_DIR']) return process.env['SCL_DEMO_DB_DIR']
   if (app.isPackaged) {
-    const userDir = join(app.getPath('userData'), 'scl_db_files')
-    if (!existsSync(userDir)) mkdirSync(userDir, { recursive: true })
-    const seedDir = join(process.resourcesPath, 'scl_db_seed')
-    for (const name of SEED_FILES) {
-      const target = join(userDir, name)
-      const seed = join(seedDir, name)
-      if (!existsSync(target) && existsSync(seed)) {
-        try {
-          copyFileSync(seed, target)
-        } catch {
-          // Non-fatal: missing seed just means we open nothing until SCL_Demo
-          // produces the file. withSclFolderDb() handles the empty case.
-        }
-      }
-    }
-    return userDir
+    seedDataRootIfNeeded()
+    return join(sclDataRootDir(), 'db_files')
   }
   return DEV_DEFAULT_DB_DIR
 }

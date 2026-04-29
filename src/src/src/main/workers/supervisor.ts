@@ -1,7 +1,9 @@
 import { spawn, type ChildProcess } from 'node:child_process'
-import { net } from 'electron'
+import { app, net } from 'electron'
 import type { WorkerStatus } from '@shared/types'
+import { sclDataRootDir } from '../db/scl-folder'
 import { recordError } from '../diagnostics/errorStore'
+import { LLM_BRIDGE_PORT } from '../llm/bridgeServer'
 import {
   SUPERVISED_WORKERS,
   resolveWorkerExecutable,
@@ -70,7 +72,23 @@ function spawnWorker(handle: WorkerHandle): void {
     return
   }
 
-  const env = { ...process.env, WORKER_HEALTH_PORT: String(cfg.healthPort) }
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    WORKER_HEALTH_PORT: String(cfg.healthPort),
+    // Tell the worker where Electron's loopback LLM bridge is listening.
+    // Workers route all completion calls through the bridge so they don't
+    // hold provider API keys themselves.
+    ELECTRON_LLM_BRIDGE_PORT: String(LLM_BRIDGE_PORT)
+  }
+  // In packaged builds, point the Python worker's data-root resolver at the
+  // per-user seed location. Without this, the resolver walks up from
+  // sys.executable looking for a `db_files/` ancestor — which doesn't exist
+  // in the install layout (resources/workers/<exe> has no sibling db_files/).
+  // Dev runs leave the env var unset so the resolver uses its dev default
+  // (the sibling SCL_Demo project at D:/Client-Side_Project/SCL_Demo/).
+  if (app.isPackaged) {
+    env['SCL_DEMO_DATA_ROOT'] = sclDataRootDir()
+  }
   const child = spawn(exe, cfg.args, { env, windowsHide: true })
   handle.child = child
   handle.status = 'running'

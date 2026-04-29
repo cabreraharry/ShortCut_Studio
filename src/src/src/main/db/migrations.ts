@@ -111,10 +111,30 @@ export function runMigrations(): void {
       classifiedAt INTEGER NOT NULL,
       reason TEXT
     );
+
   `)
+
+  // One-off destructive op (carve-out from the "additions only" rule in
+  // CLAUDE.md): the soft-warn LLM_Budgets table was shipped briefly then
+  // ripped out — local-computed spend was misleading and rotted with
+  // provider price changes. Real usage now lives on the provider's own
+  // dashboards, surfaced via per-card "Open usage dashboard" links.
+  // Idempotent: no-op once the table is gone, harmless on fresh installs.
+  db.exec('DROP TABLE IF EXISTS LLM_Budgets;')
   // AppErrors table lives in a separate errors.db — see db/errorsConnection.ts.
   // Kept out of loc_adm.db so a future "send debug bundle to support" flow can
   // ship error logs without leaking API keys / paths from this DB.
+
+  // Canonicalise Claude's Provider_Name. An earlier seed variant (or an
+  // accidental DB edit) on some installs persisted 'Claude, Anthropic' as the
+  // Provider_Name. The dispatcher's PROVIDER_NAME_BY_CODE map only knows
+  // 'Claude' as the canonical name, so any misnamed row produces "Unknown
+  // provider: Claude, Anthropic" on completion and is invisible to budget
+  // seeding (which keys by Provider_Name). UPDATE is idempotent — a no-op
+  // when the row is already 'Claude'.
+  db.prepare(
+    "UPDATE LLM_Provider SET Provider_Name = 'Claude' WHERE Provider_Name = 'Claude, Anthropic'"
+  ).run()
 
   // Seed admin settings row if missing
   const adminRow = db.prepare('SELECT RecID FROM AdminData WHERE RecID = 1').get()
@@ -134,7 +154,20 @@ export function runMigrations(): void {
     seed.run('OpenAI', 'N', 'https://api.openai.com', 'N', 'Y', 'N')
     seed.run('Claude', 'N', 'https://api.anthropic.com', 'N', 'Y', 'N')
     seed.run('Gemini', 'N', 'https://generativelanguage.googleapis.com', 'N', 'Y', 'N')
+    seed.run('HuggingFace', 'N', 'https://router.huggingface.co/v1', 'N', 'Y', 'Y')
+    seed.run('LM Studio', 'N', 'http://localhost:1234/v1', 'N', 'Y', 'N')
   }
+
+  // Backfill providers added after first seed. INSERT only if missing by name
+  // so existing user-customised rows (custom hosts, saved API keys) survive.
+  const ensureProvider = db.prepare(
+    `INSERT INTO LLM_Provider
+       (Provider_Name, Has_API_Key, API_Host, IsDefault, Supported, AllowAddModel)
+     SELECT ?, ?, ?, 'N', 'Y', ?
+     WHERE NOT EXISTS (SELECT 1 FROM LLM_Provider WHERE Provider_Name = ?)`
+  )
+  ensureProvider.run('HuggingFace', 'N', 'https://router.huggingface.co/v1', 'Y', 'HuggingFace')
+  ensureProvider.run('LM Studio', 'N', 'http://localhost:1234/v1', 'N', 'LM Studio')
 
   // Seed default privacy terms
   const privacyCount = db.prepare('SELECT COUNT(*) AS c FROM PrivacyTerms').get() as { c: number }

@@ -4,11 +4,14 @@ import type {
   LlmCompleteRequest,
   LlmCompleteResult
 } from '@shared/types'
+import { isLocalProvider } from '@shared/providers'
 import { getLocAdmDb } from '../../db/connection'
 import { recordError } from '../../diagnostics/errorStore'
 import { providerCodeFromName } from '../providerName'
 import { claudeAdapter } from './claude'
 import { geminiAdapter } from './gemini'
+import { huggingfaceAdapter } from './huggingface'
+import { lmStudioAdapter } from './lmstudio'
 import { ollamaAdapter } from './ollama'
 import { openaiAdapter } from './openai'
 import type { CompletionAdapter } from './types'
@@ -17,7 +20,9 @@ const ADAPTERS: Partial<Record<ClassifierProvider, CompletionAdapter>> = {
   claude: claudeAdapter,
   openai: openaiAdapter,
   gemini: geminiAdapter,
-  ollama: ollamaAdapter
+  ollama: ollamaAdapter,
+  huggingface: huggingfaceAdapter,
+  lmstudio: lmStudioAdapter
 }
 
 interface ProviderRow {
@@ -198,11 +203,12 @@ export async function complete(req: LlmCompleteRequest): Promise<LlmCompleteResu
         latencyMs: Date.now() - start
       }
     }
-    // Ollama is the only provider that doesn't need an API key. The adapters
-    // also re-check this internally as defense-in-depth — if the dispatcher
-    // guard is ever loosened for a provider, the adapter's own check still
-    // produces a meaningful error.
-    if (code !== 'ollama' && !providerRow.API_Key) {
+    // Local providers (Ollama, LM Studio) don't need an API key — they bind to
+    // localhost. Single source of truth in @shared/providers; the renderer uses
+    // the same list to drive the "Local" badge and hide the API-key input.
+    // Adapters also re-check key presence internally as defense-in-depth.
+    const keyOptional = isLocalProvider(providerRow.Provider_Name)
+    if (!keyOptional && !providerRow.API_Key) {
       return {
         ok: false,
         error: `${providerRow.Provider_Name} has no API key configured`,

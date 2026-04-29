@@ -7,6 +7,7 @@ import { initDatabase, closeDatabase } from './db/connection'
 import { initErrorsDb, closeErrorsDb } from './db/errorsConnection'
 import { runMigrations } from './db/migrations'
 import { startWorkerSupervisor, stopAllWorkers } from './workers/supervisor'
+import { startLlmBridgeServer, stopLlmBridgeServer } from './llm/bridgeServer'
 import { initAuthState, verifyPersistedToken } from './execengine/authState'
 import { IpcChannel } from '@shared/ipc-channels'
 
@@ -44,6 +45,11 @@ async function bootstrap(): Promise<void> {
   // call from any handler).
   initAuthState()
   registerIpcHandlers()
+  // LLM bridge must start BEFORE the supervisor — workers spawned by the
+  // supervisor need the bridge port available in their env to make their
+  // first call. AWAIT the listen callback so a fast-spawning worker doesn't
+  // race the bind syscall and get ECONNREFUSED on its first request.
+  await startLlmBridgeServer()
   startWorkerSupervisor()
   // Fire-and-forget: confirm any persisted token is still valid against SIS.
   // We don't block boot on this — UI surfaces 'connected' optimistically and
@@ -71,6 +77,7 @@ app.on('before-quit', () => {
   markQuitting()
   destroyTray()
   stopAllWorkers()
+  stopLlmBridgeServer()
   // Independent try/catch per DB so a throw in one (e.g. better-sqlite3 throws
   // TypeError on double-close) doesn't leak the other handle.
   try {

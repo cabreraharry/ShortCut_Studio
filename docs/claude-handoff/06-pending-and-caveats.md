@@ -2,30 +2,49 @@
 
 If you're a future Claude session (or a human developer) about to add a feature or fix a bug, **read this before touching anything**. These are the traps.
 
+## v0.4.0 ship summary (2026-04-29)
+
+The current installer at `src/src/release-builds/ShortCut Studio-Setup-0.4.0.exe` (~237 MB) ships:
+- **HuggingFace + LM Studio** as new LLM providers (full adapter chain: completion, classifier, discovery, onboarding UI).
+- **OpenAI inline spend display** — fetches today's USD from `/v1/usage`, hides gracefully on any failure. Other cloud providers get an "Open usage dashboard" button that opens their billing page in the browser via `app.openExternal`.
+- **LLM bridge for Python workers** — `gemini_processor` no longer hardcodes Gemini. The user's GUI provider choice flows through to scan-time topic naming via the loopback HTTP bridge on port 45123. Workers carry no API keys.
+- **All three SCL_Demo workers building + running cleanly** (PyInstaller + frozen-detect data-root resolver). Bundled into the installer with explicit allowlist (no `vapp.exe` leak).
+- **Vendored IPFS Kubo v0.41.0 + Nginx 1.26.2** in `resources/extras/`. Currently dormant — IPFS allocation feature and ExecEngine HTTP layer light them up in v2.
+- **Custom NSIS hook** — post-install MessageBox offers to open Ollama / LM Studio download pages.
+- **Per-user data root** — supervisor sets `SCL_DEMO_DATA_ROOT=<userData>/scl_data` for spawned workers; bundled `scl_data_seed/db_files/` copied across on first launch; v0.3.x users get a one-time migration from `<userData>/scl_db_files/`.
+- **Side fix:** the `'Claude, Anthropic'` Provider_Name typo from earlier seed variants is canonicalised to `'Claude'` via a one-line idempotent UPDATE in the migration. Unblocks completion routing + budget seeding (the latter only mattered briefly while `LLM_Budgets` existed; the table is now dropped).
+
+Verified end-to-end at the dev-mode level (bridge on 45123 + workers on 19001/19002/19003 all serve `/health` cleanly under the supervisor). Full installer-mode runtime verification on this machine was blocked by Windows Defender / SmartScreen on the unsigned `.exe` from a non-default install path — a real-world UX consideration that costs ~$300-$1200/yr to remove via code-signing certificate.
+
 ## High-priority caveats (read first)
 
-### 1. Worker .exe rebuilds — Python source adopted, build env still blocked (UPDATED 2026-04-28)
+### 1. Worker .exe rebuilds — DONE (2026-04-29)
 
-**Status: Python adoption complete; PyInstaller rebuilds fail on missing venv deps.**
+**Status: All three workers (`root_watchdog`, `topic_watchdog`, `gemini_processor`) build, start, and serve `/health` + `/status` correctly. Verified end-to-end with the ShortCut Studio supervisor's port + env-var contract.**
 
-The supervisor in `src/main/workers/supervisor.ts` spawns SCL_Demo's `.exes`. ALL pre-existing `.exe`s in `SCL_Demo/_exe/` (including the untouched `filescanner.exe`, `rescan.exe`, etc.) have been crashing on launch since May 2025 with `ModuleNotFoundError: No module named 'tools'` — confirmed against `_exe/root_watchdog.exe.bak`. So health pings haven't been "timing out silently" — the workers were never actually starting.
+The earlier blocker had two layers — only the first was documented:
 
-**Changes already applied to SCL_Demo (2026-04-28):**
-- `start_worker_api(default_port=19001|19002|19003, default_status={...})` added to top of `main()` in `scan/multi_watchdog_manager.py`, `scan/topic_watchdog.py`, `topics/process_data_Gemini.py`
-- Empty `__init__.py` added to `tools/`, `scan/`, `topics/` (was the silent root cause — PyInstaller dropped namespace packages)
-- All three `_ps1/build_*_exe.ps1` updated: invoke as `python -m PyInstaller` (was using the system-Python `pyinstaller` shim, missing every venv-only dep) + uvicorn hiddenimports added
-- Installed in `.venv`: `pyinstaller 6.20.0`, `fastapi 0.136.1`, `uvicorn[standard] 0.46.0`
+1. **Build-time:** PyInstaller couldn't see venv deps. Fixed earlier in 2026-04-28 by switching build scripts to `python -m PyInstaller`, adding `__init__.py` to `tools/scan/topics/`, and installing `pyinstaller`, `fastapi`, `uvicorn[standard]` in `.venv`.
+2. **Runtime:** even after a successful build, the bundled `.exe` died on startup. Under PyInstaller `--onefile`, `__file__` lives in a `_MEIxxxxxx` temp dir on the system temp drive, so any code that resolved `db_files/`, `config.json`, `Support_priv_list.json`, etc. via `os.path.dirname(__file__)` looked in the wrong place. Symptoms: `sqlite3.OperationalError: unable to open database file`, `ValueError: path is on mount 'C:', start on mount 'D:'` (cross-mount `os.path.relpath` crash), `FileNotFoundError` from the watchdog observer. The FastAPI thread started briefly then died with the parent process when watchdog init failed.
 
-**Still blocking the rebuild:**
-- `psutil` (imported by `scan/watchdog_json_manager.py`) is not in the `.venv` — `root_watchdog` and `topic_watchdog` builds will fail
-- Likely more deps missing further down the import chain. `requirements.txt` is UTF-16 encoded and outdated.
+**The fix (landed in SCL_Demo 2026-04-29):**
+- New `tools/utils_paths.py` with a single canonical resolver `get_data_root()` that tries (1) `SCL_DEMO_DATA_ROOT` env var, (2) walk up from `os.path.dirname(sys.executable)` looking for a `db_files/` ancestor when `sys.frozen` is set, (3) `<this file>/../..` as the dev fallback. Result is cached.
+- `tools/globalVariables.py`, `scan/config_scan.py`, `vapp/config_vapp.py`, `topics/config_topic.py`, `vapp/json_file.py` all routed through the resolver. Walked-up `__file__` patterns and the `os.getcwd().split(__projName__)` cwd-trick are gone.
+- `tools/utils_error.py::getContext` now wraps `os.path.relpath` in `try/except ValueError` so cross-mount cases stop spamming tracebacks.
+- New `is_supervised()` and `keep_alive_until_signal()` helpers in `tools/worker_api.py`. The three watchdog `main()`s now call `keep_alive_until_signal()` if their primary job fails to start under supervision — the FastAPI `/health` thread stays up so the supervisor sees a healthy-but-idle worker instead of a vanished one.
+- Unrelated bug fix: `tenacity.wait_exponential(factor=...)` → `exp_base=...` rename in `topics/process_data_Gemini.py` (kwarg renamed in tenacity 6.0; pre-6.0 versions use `@asyncio.coroutine` which Python 3.11+ removed, so neither version ran without this).
+- `requirements.txt` re-encoded UTF-8 and refreshed via `pip freeze`.
 
-**To finish:**
-1. `cd D:/Client-Side_Project/SCL_Demo && .venv/Scripts/Activate.ps1 && pip install psutil`
-2. Run `./_ps1/build_root_watchdog_exe.ps1`, identify next missing dep, install, repeat until the smoke test (run the .exe with `WORKER_HEALTH_PORT=19001` and `curl http://127.0.0.1:19001/health` returns `{"ok":true}`)
-3. Repeat for `topic_watchdog` and `gemini_processor`
-4. `pip freeze > requirements.txt` to capture the working dep set
-5. `_exe/*.exe.bak` safety copies left in `_exe/` — delete once new builds verified
+**Smoke test verified (2026-04-29 from this repo against `D:/Client-Side_Project/SCL_Demo/_exe/`):**
+```
+WORKER_HEALTH_PORT=19001 ./_exe/root_watchdog.exe   # /health → {"ok":true,"uptime_seconds":16.8}
+WORKER_HEALTH_PORT=19002 ./_exe/topic_watchdog.exe   # /health → ok
+WORKER_HEALTH_PORT=19003 ./_exe/gemini_processor.exe # /health → ok
+```
+
+**Caveat carried forward from the fix:** `topics/config_topic.py:127` still hardcodes the topic folder as `<user-home>/Desktop/_SCL_` (driven by `db_files/config.json::paths.topic_folder`). On a machine where that folder doesn't exist, `topic_watchdog` logs warnings but stays alive thanks to `keep_alive_until_signal()` — the supervisor sees a healthy worker that hasn't done any work. That matches the intended behavior, but is the seam to address whenever per-user folder configuration becomes a UI concern.
+
+**Cleanup pending:** `_exe/*.exe.bak` (pre-fix safety copies) still in place. Delete once you've personally validated new builds end-to-end with the running app.
 
 ### 2. Workers + seed DBs are now bundled into the installer (DONE 2026-04-28)
 
@@ -36,7 +55,7 @@ The supervisor in `src/main/workers/supervisor.ts` spawns SCL_Demo's `.exes`. AL
 
 `config.ts::resolveWorkersDir` already picks up `<resourcesPath>/workers/` as its first choice in packaged builds. `db/scl-folder.ts::sclDbDir` copies seed DBs from `resources/scl_db_seed/` to `userData/scl_db_files/` on first launch.
 
-**Caveat:** the bundled workers are still the broken pre-2026-04-28 `.exe`s until item #1 above is unblocked. New builds drop in via the existing `extraResources` block — no further config change needed.
+**Caveat (resolved 2026-04-29):** the bundled workers are now the working post-2026-04-29 `.exe`s. Item #1 above is done. New builds drop in via the existing `extraResources` block — no further config change needed. Run `npm run build:win` from `src/src/` and the working workers ride along.
 
 ### 3. Progress Glass — local is REAL, peer still synthetic (UPDATED 2026-04-28)
 
@@ -96,9 +115,9 @@ For now, clicking the button creates a job row that shows up in the active jobs 
 
 `migrations.ts` creates `ProgressSnapshots(ts, cumulativeLocal, cumulativePeer)` for the v1.5 history line chart. Nothing writes to it yet. When v1.5 lands, a background timer in the main process should snapshot the current progress every 4-6 hours.
 
-### `LLM_Usage` is declared but never written
+### `LLM_Usage` IS now written (UPDATED 2026-04-29)
 
-Same story. v1.5 concern — instrument the LLM handlers to write token counts after each call.
+`src/main/llm/completion/index.ts::logUsage()` writes a row after every successful completion call: `(providerId, modelId, feature, tokensIn, tokensOut, latencyMs, ts)`. The OpenAI-specific inline spend display on the LLMs page reads from the provider's own `/v1/usage` endpoint instead (provider-side truth beats local tally for billing); `LLM_Usage` is now used by analytics consumers downstream.
 
 ## Known UI quirks
 

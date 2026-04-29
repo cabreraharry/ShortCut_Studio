@@ -13,6 +13,8 @@ import { claudeAdapter } from './providers/claude'
 import { openaiAdapter } from './providers/openai'
 import { geminiAdapter } from './providers/gemini'
 import { ollamaAdapter } from './providers/ollama'
+import { huggingfaceAdapter } from './providers/huggingface'
+import { lmStudioAdapter } from './providers/lmstudio'
 import { mockAdapter } from './providers/mock'
 import { clipboardAdapter } from './providers/clipboard'
 import { PROVIDER_NAME_BY_CODE } from '../llm/providerName'
@@ -22,6 +24,8 @@ const ADAPTERS: Record<ClassifierProvider, ClassifierAdapter> = {
   openai: openaiAdapter,
   gemini: geminiAdapter,
   ollama: ollamaAdapter,
+  huggingface: huggingfaceAdapter,
+  lmstudio: lmStudioAdapter,
   mock: mockAdapter,
   clipboard: clipboardAdapter
 }
