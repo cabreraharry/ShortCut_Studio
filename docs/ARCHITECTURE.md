@@ -940,8 +940,12 @@ Other tables (`LLM_Provider`, `Folder`, `PrivacyTerms`, `FilterPresets`, etc.) a
 | `nodeIntegration` | `false` | Renderer can't `require('node:fs')` |
 | `sandbox` | `false` | Preload needs to use the typed contextBridge; sandbox would block it |
 | Renderer CSP | `default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data: blob:; font-src 'self' data:` | Tight; `'unsafe-inline'` for styles is needed for some Tailwind class outputs |
-| `setWindowOpenHandler` | denies `window.open`, routes to `shell.openExternal` | Prevents popups |
+| `setWindowOpenHandler` | denies `window.open`, routes to `safeOpenExternal` (https/http only) | Prevents popups + blocks `file://` / `vbscript:` schemes that would launch arbitrary binaries |
 | IPC handlers | All registered via `ipcMain.handle` (typed); validate payload shape on entry for handlers that accept complex objects (e.g. `llm:complete`, `execengine:sign-in`) | TypeScript types don't survive the IPC boundary; explicit validation throws clean errors instead of crashing |
+| `app:open-external` IPC | Wrapped in `safeOpenExternal` — refuses any URL whose `URL.protocol` isn't in `{https:, http:}` | Without this, `shell.openExternal('file:///C:/Windows/System32/calc.exe')` would launch calc on Windows. RCE if an LLM-generated link gets clicked. |
+| LLM bridge auth | Random 32-byte hex token generated at server startup, required as `X-SCS-Bridge-Token` header on `POST /llm/complete`. Workers receive it via `ELECTRON_LLM_BRIDGE_TOKEN` env var. | Localhost binding alone wasn't sufficient — any local process (downloaded malware, browser extension, peer user on shared machine) could call the bridge anonymously and burn the user's API budget. Token is per-launch, so leak is invalidated by app restart. |
+| Renderer error capping | `recordRendererError` IPC caps `message` at 4 KB, `stack` at 16 KB, `context` at 16 KB serialised | Defense-in-depth: a misbehaving renderer can't burn main-process CPU coercing multi-MB strings before the errorStore re-caps. |
+| Dev SQL console | Rejects SELECTs that reference `LLM_Provider` or `LLM_Usage` tables | Prevents accidental key leak via Ctrl+Shift+D → SQL tab → screen recording. |
 
 ### Secret handling
 
@@ -949,6 +953,7 @@ Other tables (`LLM_Provider`, `Folder`, `PrivacyTerms`, `FilterPresets`, etc.) a
 - **SIS session tokens**: same posture. Persisted plaintext in `AdminData.ExecEngineSessionToken`. 24h validity limits exposure window.
 - **SIS passwords**: never persisted. User re-enters when token expires.
 - **URL redaction in error logs**: `httpJson.ts` and the SIS auth client both strip `?key=`, `?api_key=`, `?token=` query params from URLs before embedding them in error messages.
+- **Body redaction in error logs (v0.4.1)**: [main/security/redact.ts](../src/src/src/main/security/redact.ts) strips OpenAI `sk-…`, Anthropic `sk-ant-…`, Google `AIza…`, HuggingFace `hf_…`, generic `Bearer …` and `x-api-key:` patterns from any HTTP error message text before it reaches a toast or AppErrors row. Some upstream providers echo the request's Authorization header into 4xx error bodies — without this, the user's key shows up in the error UI. Applied to all 6 provider HTTP error sites in `modelDiscovery.ts`, the OpenAI usage fetch, and the shared `httpJson` helper.
 
 ### Code signing
 

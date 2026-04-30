@@ -2,6 +2,42 @@
 
 If you're a future Claude session (or a human developer) about to add a feature or fix a bug, **read this before touching anything**. These are the traps.
 
+## Critical review + fix sweep (2026-04-30, late)
+
+User asked for a comprehensive code review + intensive testing pass + fix any real bugs / weak points / UI-UX gaps surfaced. Three parallel investigations ran (focused diff review, security audit, main-process bug hunt). Together they surfaced ~22 findings; this commit shipped only the high-confidence real bugs and the security hardening that matters for the single-user local threat model. False-positive findings are explicitly NOT changed and documented in the plan file (`.claude/plans/hi-my-colleague-and-streamed-shamir.md`) so they don't get re-litigated.
+
+What landed (commit `3b86f6e` in ShortCut_Studio + `9f38801` in Shortcut_Studio_Backend):
+
+**Security:**
+- `safeOpenExternal` URL allowlist (https/http only) — closes the `file:///C:/Windows/System32/calc.exe` RCE path that opens whenever an LLM-generated link is clicked. Wired into `app:open-external` IPC, `setWindowOpenHandler`, and the components installer's external-tool path. Blocked URLs land in AppErrors.
+- LLM bridge auth token — 32-byte hex secret generated at server startup, required as `X-SCS-Bridge-Token` header on `/llm/complete`. Without it, any local process could call the bridge anonymously and burn the user's API budget. Token is per-launch (not persisted). SCL_Demo Python client reads `ELECTRON_LLM_BRIDGE_TOKEN` env var and sends as the header.
+- `redactSecrets` strips OpenAI `sk-…`, Anthropic `sk-ant-…`, Google `AIza…`, HuggingFace `hf_…`, and generic `Bearer` / `x-api-key` patterns from error message text before it reaches toasts and the AppErrors DB. Applied to all 6 provider HTTP error sites in `modelDiscovery.ts` plus the OpenAI usage fetch and the shared `httpJson` helper.
+- Dev SQL handler rejects SELECTs against `LLM_Provider` and `LLM_Usage` (the two secret-bearing tables).
+
+**Worker supervisor robustness:**
+- `isShuttingDown` flag prevents the orphaned-process race where a worker crashing 1-5 ms before app quit gets auto-respawned AFTER `stopAllWorkers()`. Previously left stale `root_watchdog.exe` in Task Manager.
+- Per-handle `manualRestartInProgress` flag stops `restartWorker()` from racing the exit handler into a duplicate spawn — previously two processes would fight for the worker's port.
+- `decayBackoff()` reduces `restartCount` by 1 every hour of clean running, so a worker that crashed 5 times due to transient state is no longer permanently stuck in "given up" until manual UI restart.
+- New `lastHealthCheckOk` field separates "we tried recently" from "the worker actually answered" — the Diagnostics card renders an amber "no recent OK ping" badge when the process is alive but `/health` is hung. Previously the row read as "healthy" with a fresh timestamp on a hung worker.
+- LLM bridge port collision (port 45123 occupied at startup) is now caught in `main/index.ts` and logged to AppErrors with a likely-cause hint, instead of bubbling as an unhandled promise rejection.
+
+**Renderer hardening:**
+- `recordRendererError` IPC caps `message` at 4 KB, `stack` at 16 KB, `context` at 16 KB serialised (with cyclic-ref fallback) at the IPC boundary. Defense-in-depth so a buggy/malicious renderer can't burn main-process CPU coercing multi-MB strings.
+
+**UI/UX:**
+- Dashboard first-run empty state: when no folders are configured AND no scan has run, replace the bottle cards (which would all be zero) with a welcome card pointing at Folders. Refresh re-evaluates once a folder is added.
+
+Boot smoke test passed: bridge bound on `127.0.0.1:45123`, no port collisions, no auth errors from workers. Installer rebuilt cleanly (227 MB at `release-builds/ShortCut Studio-Setup-0.4.0.exe`).
+
+Reviewer findings explicitly NOT changed (see plan file for full reasoning):
+- "NSIS Components page Abort falls through" — wrong; NSIS `Abort` in a `pageLeave` callback correctly cancels the page transition.
+- "NavLink isActive doesn't match with hash" — wrong; React Router v6 strips the hash before matching.
+- "Theme localStorage flash" — real but minor, deferred to UI Phase 3.
+- "Sandbox disabled is critical" — documented architectural choice; preload uses contextBridge which sandbox would block.
+- "Migration `'Claude, Anthropic'` rename edge case" — vanishingly unlikely.
+- "ExecEngine optimistic-connected race" — no observable bug today; revisit when Queue-TCP transport ships.
+- "Startup hidden-flag dual-probe race" — `setLoginItemSettings` overwrites; no two-entry race in practice.
+
 ## v0.4.1 ship summary (2026-04-30)
 
 Wizard installer redesign + auto-start + theme persistence. Same `0.4.0` version string in `package.json` for now; the changes are additive UX/persistence work without app-behaviour deltas warranting a minor bump.
