@@ -6,7 +6,9 @@ const api: ElectronAPI = {
   app: {
     quit: () => ipcRenderer.invoke(IpcChannel.AppQuit),
     openExternal: (url) => ipcRenderer.invoke(IpcChannel.AppOpenExternal, url),
-    getVersion: () => ipcRenderer.invoke(IpcChannel.AppGetVersion)
+    getVersion: () => ipcRenderer.invoke(IpcChannel.AppGetVersion),
+    getLoginItem: () => ipcRenderer.invoke(IpcChannel.AppGetLoginItem),
+    setLoginItem: (next) => ipcRenderer.invoke(IpcChannel.AppSetLoginItem, next)
   },
   mode: {
     get: () => ipcRenderer.invoke(IpcChannel.ModeGet),
@@ -179,6 +181,10 @@ const api: ElectronAPI = {
     signIn: (req) => ipcRenderer.invoke(IpcChannel.ExecEngineSignIn, req),
     signOut: () => ipcRenderer.invoke(IpcChannel.ExecEngineSignOut),
     healthCheck: () => ipcRenderer.invoke(IpcChannel.ExecEngineHealthCheck)
+  },
+  components: {
+    list: () => ipcRenderer.invoke(IpcChannel.ComponentsList),
+    install: (id) => ipcRenderer.invoke(IpcChannel.ComponentsInstall, id)
   }
 }
 

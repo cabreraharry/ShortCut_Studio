@@ -33,6 +33,8 @@ import { SHOW_DIAGNOSTICS } from '@/lib/app-info'
 import type { AppSettings, WorkerStatus } from '@shared/types'
 import { ExecEngineCard } from './ExecEngineCard'
 import { ErrorsCard } from './ErrorsCard'
+import { ComponentsCard } from './ComponentsCard'
+import { StartupCard } from './StartupCard'
 
 export default function SettingsPage() {
   return (
@@ -46,7 +48,9 @@ export default function SettingsPage() {
       </div>
       <PathsCard />
       <AdminCard />
+      <StartupCard />
       <ExecEngineCard />
+      <ComponentsCard />
       <ErrorsCard />
       {SHOW_DIAGNOSTICS && <DiagnosticsCard />}
       <DeveloperTip />

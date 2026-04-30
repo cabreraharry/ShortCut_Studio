@@ -9,12 +9,34 @@ import { APP_VERSION, APP_BUILD_DATE } from '@/lib/app-info'
 import { AboutDialog } from './AboutDialog'
 import type { DataSource, DataSourceState } from '@shared/types'
 
+// Persist the theme toggle across restarts. Renderer-only state, so
+// localStorage is the right tool — no IPC roundtrip, no DB schema bump,
+// instant read on mount. Initial value reads from storage; absent key falls
+// back to dark (the app's intended default per CLAUDE.md).
+const THEME_STORAGE_KEY = 'scs.theme'
+
+function readStoredTheme(): boolean {
+  try {
+    const raw = localStorage.getItem(THEME_STORAGE_KEY)
+    if (raw === 'dark') return true
+    if (raw === 'light') return false
+  } catch {
+    // localStorage can throw in odd Electron sandbox states; fall through.
+  }
+  return true
+}
+
 function useTheme() {
-  const [isDark, setIsDark] = useState(false)
+  const [isDark, setIsDark] = useState<boolean>(readStoredTheme)
   useEffect(() => {
     const root = document.documentElement
     if (isDark) root.classList.add('dark')
     else root.classList.remove('dark')
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, isDark ? 'dark' : 'light')
+    } catch {
+      // ignore persistence failure; in-memory toggle still works
+    }
   }, [isDark])
   return { isDark, toggle: () => setIsDark((v) => !v) }
 }

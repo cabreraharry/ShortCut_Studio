@@ -1,3 +1,4 @@
+import type { ComponentId, ComponentStatus } from './components-manifest'
 import type {
   AppSettings,
   ClassifiedFilename,
@@ -41,6 +42,7 @@ import type {
   LlmOpenAiUsageResult,
   LlmProvider,
   LlmTestResult,
+  LoginItemSettings,
   PrivacyTerm,
   ProgressByStage,
   ProgressHistoryPoint,
@@ -63,6 +65,8 @@ export interface ElectronAPI {
     quit: () => void
     openExternal: (url: string) => Promise<void>
     getVersion: () => Promise<string>
+    getLoginItem: () => Promise<LoginItemSettings>
+    setLoginItem: (next: LoginItemSettings) => Promise<LoginItemSettings>
   }
   mode: {
     get: () => Promise<DbMode>
@@ -198,6 +202,10 @@ export interface ElectronAPI {
     signIn: (req: ExecEngineSignInRequest) => Promise<ExecEngineSignInResult>
     signOut: () => Promise<ExecEngineConnectionStatus>
     healthCheck: () => Promise<ExecEngineConnectionStatus>
+  }
+  components: {
+    list: () => Promise<ComponentStatus[]>
+    install: (id: ComponentId) => Promise<void>
   }
 }
 

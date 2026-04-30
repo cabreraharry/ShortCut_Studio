@@ -3,6 +3,8 @@ export const IpcChannel = {
   AppQuit: 'app:quit',
   AppOpenExternal: 'app:open-external',
   AppGetVersion: 'app:get-version',
+  AppGetLoginItem: 'app:get-login-item',
+  AppSetLoginItem: 'app:set-login-item',
 
   // Mode
   ModeGet: 'mode:get',
@@ -125,7 +127,11 @@ export const IpcChannel = {
   ExecEngineSetConfig: 'execengine:set-config',
   ExecEngineSignIn: 'execengine:sign-in',
   ExecEngineSignOut: 'execengine:sign-out',
-  ExecEngineHealthCheck: 'execengine:health-check'
+  ExecEngineHealthCheck: 'execengine:health-check',
+
+  // Optional components (IPFS, Nginx, Ollama, LM Studio)
+  ComponentsList: 'components:list',
+  ComponentsInstall: 'components:install'
 } as const
 
 export type IpcChannelName = (typeof IpcChannel)[keyof typeof IpcChannel]

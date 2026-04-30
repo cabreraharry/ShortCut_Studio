@@ -26,7 +26,13 @@ export function createMainWindow(): BrowserWindow {
     }
   })
 
-  win.once('ready-to-show', () => win.show())
+  // Skip the initial show when the app was auto-launched at login with the
+  // --hidden flag (set by the Settings -> Startup toggle). The tray icon stays
+  // active so the user can pop the window when they want it.
+  const startHidden = process.argv.includes('--hidden')
+  if (!startHidden) {
+    win.once('ready-to-show', () => win.show())
+  }
 
   // Tray-resident: clicking the X hides instead of destroying so the tray icon
   // still has a live window to toggle. Real teardown happens once before-quit

@@ -466,6 +466,8 @@ The `audit-ipc` Claude Code skill cross-checks all four for any drift.
 | **app** | `app:quit` | `api.app.quit()` | |
 | | `app:open-external` | `api.app.openExternal(url)` | `shell.openExternal` |
 | | `app:get-version` | `api.app.getVersion()` | |
+| | `app:get-login-item` | `api.app.getLoginItem()` | **v0.4.1**: returns `{ openAtLogin, startHidden }` from the Windows registry. Probes `getLoginItemSettings({ args:['--hidden'] })` to detect the hidden variant. |
+| | `app:set-login-item` | `api.app.setLoginItem(next)` | **v0.4.1**: writes `HKCU\…\Run` via `app.setLoginItemSettings`, appending `--hidden` when `startHidden` is true. Returns the post-write state. |
 | **mode** | `mode:get` | `api.mode.get()` | Returns 'publ'\|'priv' |
 | | `mode:set` | `api.mode.set(next)` | |
 | **dataSource** | `dataSource:get` / `:set` | `api.dataSource.get/set` | Demo vs. Prod toggle (Header pill) |
@@ -507,6 +509,8 @@ The `audit-ipc` Claude Code skill cross-checks all four for any drift.
 | | `execengine:sign-in` | `api.execengine.signIn(req)` | Real SIS HTTP |
 | | `execengine:sign-out` | `api.execengine.signOut()` | |
 | | `execengine:health-check` | `api.execengine.healthCheck()` | Probes SIS /health |
+| **components** | `components:list` | `api.components.list()` | **v0.4.1**: returns `ComponentStatus[]` for all 4 entries in `@shared/components-manifest`. Bundled probes `process.resourcesPath/extras/<id>/<sentinel>`; external probes `localhost:<port>`. |
+| | `components:install` | `api.components.install(id)` | **v0.4.1**: bundled → download+extract from the same URL `scripts/fetch-vendor-binaries.mjs` uses, lands in `resources/extras/<id>/`. External → `shell.openExternal(externalUrl)`. Dev mode: bundled install throws (would pollute Electron's own resources). |
 
 ---
 
@@ -569,7 +573,9 @@ Multiple cards in order:
 
 - **Paths** — shows hidden content folder + Desktop search folder (Move buttons disabled; not yet implemented)
 - **Admin values** — Localhost port (default 44999), Topic threshold, CPU threshold
+- **Startup** ← **v0.4.1**. Two checkboxes: "Launch at Windows startup" (toggles the registry entry under `HKCU\…\Run` via Electron's `app.setLoginItemSettings`) and "Start minimized to the system tray" (appends `--hidden` to the auto-launch args; [window.ts](../src/src/src/main/window.ts) checks `process.argv` and skips the initial `win.show()` when present). Renders the actual current registry state; external changes (e.g. user disables it from Task Manager) are picked up next mount.
 - **ExecEngine connection** ← **Round 2**. Connection state badge, host/port editor, sign-in dialog, sign-out, health-check button. Polls `getStatus` every 10s.
+- **Components** ← **v0.4.1**. Lists the 4 entries in `@shared/components-manifest.ts` with per-row status badges. Bundled (IPFS, Nginx) show "Bundled — installed" or "Removed at install (re-add below)" with an `[Install]` button that re-downloads + extracts via the runtime port of `fetch-vendor-binaries.mjs`. External (Ollama, LM Studio) show "Detected on :PORT" or "Not detected" with a `[Get it ↗]` button that opens the download URL. Auto-refreshes every 15s.
 - **Errors** — App-wide errors panel reading `errors.db`. Severity + source filters, expandable rows showing stack + context, "Clear all" button with confirm dialog, 5s auto-refresh, paginated 50/page. Default filter is `severity=error` to hide validation noise.
 - **Diagnostics** (gated by `SHOW_DIAGNOSTICS=true` env at build) — WorkerConstellation visualisation + per-worker rows with status, last health check, Restart button, log-tail viewer.
 
@@ -852,9 +858,24 @@ nsis:
 
 Currently dormant in the running app — IPFS allocation feature and ExecEngine HTTP/Nginx layer light them up in v2.
 
-### Custom NSIS hook (v0.4.0)
+### Wizard installer (v0.4.1)
 
-[build/installer.nsh](../src/src/build/installer.nsh) defines a single `customFinish` macro: at end of install, MessageBox MB_YESNO asks the user whether to open download pages for Ollama / LM Studio. `/SD IDNO` makes silent installs (`Setup.exe /S`) default to "No" so unattended installs don't pop browser tabs. Yes opens both URLs via `ExecShell "open"`. The label is uniquified with `${__LINE__}` so it can't collide with future electron-builder template labels.
+[build/installer.nsh](../src/src/build/installer.nsh) replaces the v0.4.0 single-MessageBox `customFinish` with a full multi-page wizard that uses electron-builder's documented hook surface. The whole file is wrapped in `!ifndef BUILD_UNINSTALLER` because none of the macros wire into the uninstaller pass — without that gate, NSIS warning 6010 ("install function not referenced") fires during the uninstaller compile and electron-builder treats it as a build error.
+
+**Page flow** (matches electron-builder's `assistedInstaller.nsh` ordering):
+
+| Page | Hook used | What it does |
+|---|---|---|
+| **Welcome** | `customWelcomePage` | Replaces the default Welcome with a custom one listing what's bundled (app, workers, IPFS, Nginx, seed DBs). Mentions "you'll be able to opt out of optional bundles on the next page." |
+| License | _(template default)_ | electron-builder's `licensePage` if a license file is configured |
+| Install Location | _(template default)_ | `MUI_PAGE_DIRECTORY` |
+| **Components** | `customPageAfterChangeDir` | New mid-flow page. Two `nsDialogs` checkboxes for IPFS Kubo + Nginx, both default ON. Description text explains they power v2 features (peer-shared scan, ExecEngine HTTP layer) and are dormant in v0.4.x. `ComponentsPageLeave` reads `${NSD_GetState}` into `$INSTALL_IPFS` / `$INSTALL_NGINX` and, if either is unchecked, surfaces an `MB_YESNO|MB_ICONQUESTION` confirmation explaining the implications and giving a chance to go back. `/SD IDYES` keeps silent installs from blocking. |
+| Installing | _(template default)_ | `MUI_PAGE_INSTFILES` runs; `customInstall` fires inside the section. We do post-copy `RMDir /r` for any opt-outs (`resources/extras/ipfs/`, `resources/extras/nginx/`) — cheaper than threading conditional file-copy through electron-builder's NSIS template, since the asar archive ships everything anyway. `DetailPrint` lines surface the deletions in the install log. |
+| **Finish** | `customFinishPage` | Replaces the default Finish. `FinishPagePopulateText` runs as `MUI_PAGE_CUSTOMFUNCTION_PRE` and probes `IfFileExists "$LOCALAPPDATA\Programs\Ollama\ollama.exe"` + `…\LM Studio\LM Studio.exe` (named labels — `+N` relative jumps were a footgun in early drafts). It composes `$FINISH_BODY_TEXT` showing each tool as "Detected" or "Not installed", and picks `$FINISH_LINK_URL` / `$FINISH_LINK_LABEL` to point the MUI link at whichever tool is missing first (Ollama wins ties). `MUI_FINISHPAGE_TEXT "$FINISH_BODY_TEXT"` works because NSIS evaluates `$VAR` references inside `NSD_CreateLabel` calls at render time, not compile time. The page also has the standard `MUI_FINISHPAGE_RUN` checkbox to launch the app. |
+
+**Silent install / CLI flags**: `Setup.exe /S /COMPONENTS=IPFS,NGINX /D=C:\Apps\SCS`. `customInit` parses `/COMPONENTS=` via `${StrLoc}` (registered at file scope; gated on the installer pass). When the flag is present it's treated as an exhaustive whitelist — anything not listed is opted out. When absent, both default to "1" (full install) for back-compat with v0.4.0 silent-install scripts. `${StrLoc}` registration requires `!include "StrFunc.nsh"` followed by a no-args `${StrLoc}` "declaration" call before subsequent `${StrLoc <args>}` usages compile.
+
+**Shared manifest**: [src/shared/components-manifest.ts](../src/src/src/shared/components-manifest.ts) is the single source of truth for what "IPFS" / "NGINX" / "OLLAMA" / "LMSTUDIO" mean. The NSIS surface, the `[components:list]` IPC handler ([main/components/detector.ts](../src/src/src/main/components/detector.ts)), and the [Settings → Components](../src/src/src/renderer/features/settings/ComponentsCard.tsx) panel all read from this list. Adding a new bundled component is a five-line edit to the manifest plus a `vendor/<id>/` entry in `electron-builder.yml::extraResources` and a vendor-fetcher spec — the wizard checkbox + Settings panel row materialise automatically (the NSIS page itself is currently hardcoded to IPFS+NGINX; an additional bundled component would need a new var + checkbox in `installer.nsh`).
 
 ### Installer output
 
@@ -886,6 +907,14 @@ Currently dormant in the running app — IPFS allocation feature and ExecEngine 
 | `ExecEngineTokenExpiresAt` | NULL | **Round 2** epoch seconds |
 
 Other tables (`LLM_Provider`, `Folder`, `PrivacyTerms`, `FilterPresets`, etc.) are user-editable via the UI.
+
+### Stored in localStorage (renderer-side, survives restart):
+
+- **Theme toggle** — key `scs.theme`, value `'dark' | 'light'`. Read on Header mount; absent → falls back to dark. The earlier bug (v0.4.0) was that [Header.tsx::useTheme](../src/src/src/renderer/components/layout/Header.tsx) initialised `useState(false)` on every mount and never persisted, so every restart ran `classList.remove('dark')` on first render and reverted to light regardless of `<html>` ship state.
+
+### Stored in OS registry (Windows-only, read via Electron):
+
+- **Login item** — `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`. `app.getLoginItemSettings()` is the canonical reader. The "start hidden" sub-state isn't exposed in the return type, so [main/ipc/app.ts::readLoginItem](../src/src/src/main/ipc/app.ts) probes a second time with `args: ['--hidden']` to detect the hidden variant. If something external rewrites the entry with different args, the "Start minimized" toggle would show off — re-toggling fixes the drift.
 
 ### In-memory only (resets on every app restart):
 

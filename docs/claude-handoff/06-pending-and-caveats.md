@@ -2,6 +2,23 @@
 
 If you're a future Claude session (or a human developer) about to add a feature or fix a bug, **read this before touching anything**. These are the traps.
 
+## v0.4.1 ship summary (2026-04-30)
+
+Wizard installer redesign + auto-start + theme persistence. Same `0.4.0` version string in `package.json` for now; the changes are additive UX/persistence work without app-behaviour deltas warranting a minor bump.
+
+What landed:
+
+- **Multi-page NSIS wizard** replacing v0.4.0's single end-of-install MessageBox. Welcome page lists the bundled stack (app, workers, IPFS, Nginx, seed DBs); a new mid-flow Components page lets the user opt out of IPFS / Nginx (post-copy `RMDir /r`); the Finish page detects Ollama and LM Studio installs (`IfFileExists` against `%LOCALAPPDATA%\Programs\…\*.exe`) and shows inline status + a single MUI link to whichever is missing first. The whole `installer.nsh` file is wrapped in `!ifndef BUILD_UNINSTALLER` to suppress NSIS warning 6010 during the uninstaller compile (electron-builder treats those as build errors).
+- **Opt-out warning** — if either bundled component is unchecked, an `MB_YESNO|MB_ICONQUESTION` confirmation surfaces explaining the implications (v2 features won't work without re-add) before allowing Next. `/SD IDYES` keeps silent installs unblocked.
+- **`/COMPONENTS=` CLI flag** — `Setup.exe /S /COMPONENTS=IPFS,NGINX /D=C:\Apps\SCS`. Exhaustive whitelist when present; defaults to all-on when absent (back-compat with v0.4.0 silent scripts). Parser uses `${StrLoc}` from `StrFunc.nsh` (registered with the no-args declaration call at file scope, gated on the installer pass).
+- **Shared `OptionalComponent` manifest** at [src/shared/components-manifest.ts](../../src/src/src/shared/components-manifest.ts). Single source of truth for IPFS / Nginx / Ollama / LM Studio. Read by the NSIS surface (hardcoded for now), the new `[components:list]` IPC handler, and the new Settings → Components panel. Bundled entries carry `vendorFetchKey` matching `scripts/fetch-vendor-binaries.mjs`; external entries carry `externalUrl` + `detectPort`.
+- **Settings → Components panel** at [renderer/features/settings/ComponentsCard.tsx](../../src/src/src/renderer/features/settings/ComponentsCard.tsx). Auto-refreshes every 15s. Bundled rows show "Bundled — installed" or "Removed at install" with an `[Install]` button that re-downloads + extracts via the runtime port of the vendor fetcher (`main/components/installer.ts`). External rows show "Detected on :PORT" or "Not detected" with a `[Get it ↗]` button. Bundled install in dev mode throws — would otherwise pollute Electron's own `resources/`.
+- **Settings → Startup card** at [renderer/features/settings/StartupCard.tsx](../../src/src/src/renderer/features/settings/StartupCard.tsx). Two checkboxes: "Launch at Windows startup" toggles `HKCU\…\Run` via Electron's `app.setLoginItemSettings`; "Start minimized to the system tray" appends `--hidden` to the registered launch args. [window.ts](../../src/src/src/main/window.ts) checks `process.argv.includes('--hidden')` and skips the initial `win.show()`. State is read live from the registry on every Settings mount (no cache), so external changes via Task Manager are picked up.
+- **Theme toggle now persists** — [Header.tsx::useTheme](../../src/src/src/renderer/components/layout/Header.tsx) reads/writes localStorage key `scs.theme`. The v0.4.0 hook initialised `useState(false)` on every mount and ran `classList.remove('dark')` on first render, so every restart reverted to light regardless of the user's choice.
+- **Code-reviewer-flagged fixes** — `IfFileExists +N` relative jumps replaced with named labels (real off-by-one bug in early drafts); PowerShell single-quote escape (`psQuote` + `-LiteralPath`) for usernames containing `'`; bundled-component install gated on `app.isPackaged`.
+
+Build artifact: `release-builds/ShortCut Studio-Setup-0.4.0.exe` (still 227 MB — only behavioural changes, no new bundled bytes).
+
 ## v0.4.0 ship summary (2026-04-29)
 
 The current installer at `src/src/release-builds/ShortCut Studio-Setup-0.4.0.exe` (~237 MB) ships:

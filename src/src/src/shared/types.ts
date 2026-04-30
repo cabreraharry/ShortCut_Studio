@@ -16,6 +16,17 @@ export interface AppSettings {
   welcomeOnStartup: boolean
 }
 
+// Mirrors a subset of Electron's LoginItemSettings — what we actually expose
+// in the UI. The OS holds the source of truth (registry on Windows), so we
+// just round-trip through Electron's app.getLoginItemSettings/setLoginItemSettings.
+export interface LoginItemSettings {
+  openAtLogin: boolean
+  // Whether to start with the main window hidden (tray-resident only). Maps
+  // to passing `--hidden` in the launch args; window.ts checks the flag and
+  // skips the initial show().
+  startHidden: boolean
+}
+
 export interface FolderRow {
   id: number
   path: string
