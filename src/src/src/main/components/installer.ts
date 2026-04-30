@@ -10,8 +10,9 @@ import {
   writeFileSync
 } from 'node:fs'
 import { join } from 'node:path'
-import { app, net, shell } from 'electron'
+import { app, net } from 'electron'
 import { getComponent, type ComponentId } from '@shared/components-manifest'
+import { safeOpenExternal } from '../security/safeUrl'
 
 // Runtime install for optional components, mirroring scripts/fetch-vendor-
 // binaries.mjs but at app-runtime instead of build-time. This is the codepath
@@ -192,7 +193,10 @@ export async function installComponent(id: ComponentId): Promise<void> {
     if (!component.externalUrl) {
       throw new Error(`Component ${id} has no externalUrl`)
     }
-    await shell.openExternal(component.externalUrl)
+    const ok = await safeOpenExternal(component.externalUrl)
+    if (!ok) {
+      throw new Error(`Refused to open external URL for ${id} (scheme not allowed)`)
+    }
     return
   }
   await installBundled(id)

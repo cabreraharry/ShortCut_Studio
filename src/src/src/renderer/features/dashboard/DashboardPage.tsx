@@ -11,8 +11,11 @@ import {
   FileStack,
   Cpu,
   Users,
-  Hourglass
+  Hourglass,
+  FolderPlus
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { EmptyState } from '@/components/visual/EmptyState'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -114,7 +117,12 @@ function ArtifactTabs({
 }
 
 export default function DashboardPage() {
+  const navigate = useNavigate()
   const [range, setRange] = useState<TimeRange>('5d')
+  const { data: folders = [] } = useQuery({
+    queryKey: ['folders'],
+    queryFn: () => api.folders.list()
+  })
   const { data: summary } = useQuery({
     queryKey: ['progress-summary', range],
     queryFn: () => api.progress.summary(range),
@@ -174,6 +182,35 @@ export default function DashboardPage() {
       }
     }
   }, [summary, allTimeTotalPct, fireMilestone])
+
+  // First-run empty state: no folders configured AND no scan data. Replace
+  // the bottle cards (which would all be zero) with a welcome card pointing
+  // at the Folders page so the user knows what the next step is. Refresh
+  // re-evaluates this condition automatically once a folder gets added.
+  const isFirstRun = folders.length === 0 && (summary?.totalFiles ?? 0) === 0
+
+  if (isFirstRun) {
+    return (
+      <div className="space-y-6">
+        <DashboardWelcomeHero />
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">Your library at a glance — once there's a library to glance at.</p>
+        </div>
+        <EmptyState
+          variant="folders"
+          title="Add a folder to get started"
+          description="The Dashboard fills in once ShortCut Studio has scanned at least one folder. Pick a folder of PDFs or eBooks on the Folders page — the workers handle the rest."
+          action={
+            <Button onClick={() => navigate('/folders')}>
+              <FolderPlus className="mr-2 h-4 w-4" />
+              Go to Folders
+            </Button>
+          }
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

@@ -3,7 +3,7 @@ import { app, net } from 'electron'
 import type { WorkerStatus } from '@shared/types'
 import { sclDataRootDir } from '../db/scl-folder'
 import { recordError } from '../diagnostics/errorStore'
-import { LLM_BRIDGE_PORT } from '../llm/bridgeServer'
+import { LLM_BRIDGE_PORT, getBridgeToken } from '../llm/bridgeServer'
 import {
   SUPERVISED_WORKERS,
   resolveWorkerExecutable,
@@ -31,17 +31,47 @@ interface WorkerHandle {
   child: ChildProcess | null
   status: WorkerStatus['status']
   lastHealthCheck?: number
+  // Whether the most recent /health ping succeeded. Differs from
+  // lastHealthCheck because a timeout updates the timestamp (so the UI knows
+  // we tried) but flips this flag to false (so the UI doesn't lie about
+  // "Healthy, last check 1s ago" while the worker is actually hung).
+  lastHealthCheckOk?: boolean
   exitCode?: number
   restartCount: number
+  // Per-handle backoff tracking. lastSuccessfulRunStart resets each time the
+  // worker reaches a stable 'running' state; the health-poll interval decays
+  // restartCount by 1 every BACKOFF_DECAY_MS of clean uptime so a transient
+  // crash burst doesn't permanently lock the worker out.
+  lastSuccessfulRunStart?: number
+  // Set true while restartWorker() is intentionally killing the child, so the
+  // exit handler skips its auto-respawn path and lets restartWorker do the
+  // single re-spawn. Cleared once that re-spawn lands.
+  manualRestartInProgress: boolean
   logBuffer: string[]
 }
 
 const LOG_RING = 400
 const MAX_RESTART_ATTEMPTS = 5
 const HEALTH_POLL_MS = 10_000
+// Decay restartCount by 1 every hour of clean running. A worker that crashed
+// 5 times due to a transient state (cold disk cache, GC pressure) but then
+// stabilises gets its budget back gradually instead of staying "given up"
+// until manual restart.
+const BACKOFF_DECAY_MS = 60 * 60 * 1000
 
 const handles = new Map<string, WorkerHandle>()
 let healthInterval: NodeJS.Timeout | null = null
+// Set in stopAllWorkers() so any in-flight crash-restart setTimeout that
+// fires AFTER shutdown skips spawning — preventing the orphaned-process leak
+// where Task Manager shows root_watchdog.exe still running after app quit.
+//
+// Intentionally module-scope and never reset: startWorkerSupervisor() is
+// called exactly once per app process (from main/index.ts whenReady), and
+// the process exits after stopAllWorkers(). If a future "hot restart" path
+// ever calls startWorkerSupervisor() a second time, this flag would prevent
+// any spawn — that path would need to reset the flag itself before calling
+// in.
+let isShuttingDown = false
 
 function initHandle(cfg: WorkerConfig): WorkerHandle {
   return {
@@ -49,6 +79,7 @@ function initHandle(cfg: WorkerConfig): WorkerHandle {
     child: null,
     status: 'stopped',
     restartCount: 0,
+    manualRestartInProgress: false,
     logBuffer: []
   }
 }
@@ -78,7 +109,11 @@ function spawnWorker(handle: WorkerHandle): void {
     // Tell the worker where Electron's loopback LLM bridge is listening.
     // Workers route all completion calls through the bridge so they don't
     // hold provider API keys themselves.
-    ELECTRON_LLM_BRIDGE_PORT: String(LLM_BRIDGE_PORT)
+    ELECTRON_LLM_BRIDGE_PORT: String(LLM_BRIDGE_PORT),
+    // Per-launch shared secret. Workers send it as the X-SCS-Bridge-Token
+    // header on every /llm/complete POST. Without this, any local process
+    // could call the bridge and burn the user's API budget anonymously.
+    ELECTRON_LLM_BRIDGE_TOKEN: getBridgeToken()
   }
   // In packaged builds, point the Python worker's data-root resolver at the
   // per-user seed location. Without this, the resolver walks up from
@@ -92,6 +127,10 @@ function spawnWorker(handle: WorkerHandle): void {
   const child = spawn(exe, cfg.args, { env, windowsHide: true })
   handle.child = child
   handle.status = 'running'
+  handle.lastSuccessfulRunStart = Date.now()
+  // Clear the manual-restart flag now that the new child is up — subsequent
+  // exits revert to the normal auto-restart code path.
+  handle.manualRestartInProgress = false
   pushLog(handle, `[supervisor] started ${cfg.name} (pid=${child.pid})`)
 
   child.stdout?.on('data', (chunk: Buffer) => {
@@ -123,11 +162,24 @@ function spawnWorker(handle: WorkerHandle): void {
         }
       })
     }
+    if (handle.manualRestartInProgress) {
+      // restartWorker() killed this child intentionally and will spawn the
+      // replacement itself. Skip the auto-restart path so we don't end up
+      // with two processes fighting for the same port.
+      pushLog(handle, `[supervisor] ${cfg.name} exit absorbed by manual restart`)
+      return
+    }
     if (crashed && handle.restartCount < MAX_RESTART_ATTEMPTS) {
       const delay = Math.min(30_000, 2_000 * Math.pow(2, handle.restartCount))
       handle.restartCount += 1
       pushLog(handle, `[supervisor] restarting in ${delay}ms (attempt ${handle.restartCount})`)
-      setTimeout(() => spawnWorker(handle), delay)
+      setTimeout(() => {
+        if (isShuttingDown) {
+          pushLog(handle, `[supervisor] ${cfg.name} restart skipped — app shutting down`)
+          return
+        }
+        spawnWorker(handle)
+      }, delay)
     } else if (crashed) {
       pushLog(handle, `[supervisor] giving up on ${cfg.name} after ${handle.restartCount} restarts`)
       recordError({
@@ -169,10 +221,30 @@ async function pingHealth(handle: WorkerHandle): Promise<void> {
       req.end()
     })
     handle.lastHealthCheck = Date.now()
+    handle.lastHealthCheckOk = true
   } catch {
     // Endpoint not responding — worker may not have adopted the FastAPI
     // wrapper yet. Don't treat as crash unless the process itself has died.
+    // Update timestamp+flag so the UI can distinguish "we tried recently and
+    // it didn't answer" (warning state) from "we never tried" (unknown).
+    handle.lastHealthCheck = Date.now()
+    handle.lastHealthCheckOk = false
   }
+}
+
+// Decay restartCount by 1 for any worker that's been cleanly running for
+// BACKOFF_DECAY_MS. Called from the same interval as pingHealth so we don't
+// proliferate timers.
+function decayBackoff(handle: WorkerHandle): void {
+  if (handle.status !== 'running' || handle.restartCount === 0) return
+  if (!handle.lastSuccessfulRunStart) return
+  if (Date.now() - handle.lastSuccessfulRunStart < BACKOFF_DECAY_MS) return
+  handle.restartCount = Math.max(0, handle.restartCount - 1)
+  handle.lastSuccessfulRunStart = Date.now()
+  pushLog(
+    handle,
+    `[supervisor] backoff decayed; restartCount=${handle.restartCount}`
+  )
 }
 
 export function startWorkerSupervisor(): void {
@@ -184,11 +256,19 @@ export function startWorkerSupervisor(): void {
 
   if (healthInterval) clearInterval(healthInterval)
   healthInterval = setInterval(() => {
-    for (const handle of handles.values()) pingHealth(handle)
+    for (const handle of handles.values()) {
+      pingHealth(handle)
+      decayBackoff(handle)
+    }
   }, HEALTH_POLL_MS)
 }
 
 export function stopAllWorkers(): void {
+  // Set the shutdown flag BEFORE killing children. The exit handler's
+  // setTimeout-restart path checks this flag and bails out, so a worker that
+  // crashes 1-5 ms before stopAllWorkers runs doesn't get auto-respawned
+  // after the supervisor has "stopped".
+  isShuttingDown = true
   if (healthInterval) {
     clearInterval(healthInterval)
     healthInterval = null
@@ -209,6 +289,7 @@ export function getWorkerStatuses(): WorkerStatus[] {
       pid: handle.child?.pid,
       status: handle.status,
       lastHealthCheck: handle.lastHealthCheck,
+      lastHealthCheckOk: handle.lastHealthCheckOk,
       exitCode: handle.exitCode,
       restartCount: handle.restartCount
     })
@@ -220,9 +301,11 @@ export async function restartWorker(name: string): Promise<void> {
   const handle = handles.get(name)
   if (!handle) return
   if (handle.child && !handle.child.killed) {
+    // Tell the exit handler to skip its auto-respawn — otherwise we end up
+    // with two processes (one from the exit-handler setTimeout, one from
+    // spawnWorker below) fighting for the worker's port.
+    handle.manualRestartInProgress = true
     handle.child.kill()
-    // spawn happens via the 'exit' handler if crashed — but here it's a
-    // deliberate restart, so kick off ourselves after a short delay.
     await new Promise((r) => setTimeout(r, 500))
   }
   handle.restartCount = 0

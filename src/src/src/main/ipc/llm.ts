@@ -3,6 +3,7 @@ import { IpcChannel } from '@shared/ipc-channels'
 import { getLocAdmDb } from '../db/connection'
 import { AuthFailedError, discoverModels } from '../llm/modelDiscovery'
 import { complete } from '../llm/completion'
+import { redactSecrets } from '../security/redact'
 import type {
   LlmCompleteRequest,
   LlmCompleteResult,
@@ -255,7 +256,10 @@ export function registerLlmHandlers(): void {
             res.on('end', () => {
               const text = Buffer.concat(chunks).toString('utf8')
               if ((res.statusCode ?? 0) >= 400) {
-                reject(new Error(`HTTP ${res.statusCode}: ${text.slice(0, 200)}`))
+                // Defensive: some providers echo the request's Authorization
+                // header back into 4xx error bodies. redactSecrets strips
+                // common API-key shapes before the toast/log captures it.
+                reject(new Error(`HTTP ${res.statusCode}: ${redactSecrets(text.slice(0, 200))}`))
                 return
               }
               resolve(text)

@@ -1,4 +1,5 @@
 import { net } from 'electron'
+import { redactSecrets } from '../../security/redact'
 
 export interface HttpJsonRequest {
   url: string
@@ -58,7 +59,9 @@ export async function httpJson<T = unknown>(opts: HttpJsonRequest): Promise<T> {
             reject(new Error(`Bad JSON from ${safeUrl}: ${(err as Error).message}`))
           }
         } else {
-          reject(new Error(`HTTP ${status} from ${safeUrl}: ${text.slice(0, 400)}`))
+          // Bodies sometimes echo Authorization headers under 4xx; redact
+          // before composing the error string.
+          reject(new Error(`HTTP ${status} from ${safeUrl}: ${redactSecrets(text.slice(0, 400))}`))
         }
       })
       res.on('error', reject)

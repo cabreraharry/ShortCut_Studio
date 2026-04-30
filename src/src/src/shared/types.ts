@@ -497,6 +497,11 @@ export interface WorkerStatus {
   pid?: number
   status: 'running' | 'stopped' | 'crashed'
   lastHealthCheck?: number
+  // True only when the most recent /health probe returned a success status.
+  // Differs from lastHealthCheck (always updated on each tick): a hung worker
+  // gets the timestamp updated but this flag flipped to false, so the UI can
+  // distinguish "responded recently" from "we tried but no answer".
+  lastHealthCheckOk?: boolean
   exitCode?: number
   restartCount: number
 }

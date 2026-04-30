@@ -1,6 +1,7 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow } from 'electron'
 import { join } from 'node:path'
 import { resolveAppIconPath } from './icon'
+import { safeOpenExternal } from './security/safeUrl'
 
 let isQuitting = false
 
@@ -45,7 +46,10 @@ export function createMainWindow(): BrowserWindow {
   })
 
   win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url)
+    // Same scheme allowlist as the IPC path — fire-and-forget the promise
+    // (the handler must return synchronously). Blocked URLs land in the
+    // Errors panel instead of triggering ShellExecute on a `file://` URL.
+    void safeOpenExternal(url)
     return { action: 'deny' }
   })
 

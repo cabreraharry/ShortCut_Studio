@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http'
+import { randomBytes } from 'node:crypto'
 import { complete } from './completion'
 import { recordError } from '../diagnostics/errorStore'
 import type { LlmCompleteRequest } from '@shared/types'
@@ -18,18 +19,29 @@ import type { LlmCompleteRequest } from '@shared/types'
  * supervisor (e.g. `python -m topics.process_data_Gemini`).
  *
  * Endpoints:
- *   GET  /health            → `{ ok: true }`. Cheap liveness check.
+ *   GET  /health            → `{ ok: true }`. Cheap liveness check (no auth).
  *   POST /llm/complete      → wraps `complete()`. Body matches LlmCompleteRequest.
+ *                             Requires `X-SCS-Bridge-Token` header.
  *
- * No auth: localhost-only binding is the access boundary. Adding a shared
- * secret would just be ceremony — anything that can already make loopback
- * requests on this machine has equivalent access to the SQLite DB the bridge
- * reads from.
+ * Auth: a 32-byte hex token is generated at server startup and shared with
+ * spawned workers via the ELECTRON_LLM_BRIDGE_TOKEN env var. Localhost binding
+ * gates network reachability; the header gates which local processes can
+ * actually drive completions on the user's keys. Token is per-launch (not
+ * persisted), so a leak is invalidated by an app restart.
  */
 
 export const LLM_BRIDGE_PORT = 45123
+export const LLM_BRIDGE_TOKEN_HEADER = 'x-scs-bridge-token'
 
 let server: Server | null = null
+let bridgeToken: string | null = null
+
+export function getBridgeToken(): string {
+  if (!bridgeToken) {
+    bridgeToken = randomBytes(32).toString('hex')
+  }
+  return bridgeToken
+}
 
 // 1 MiB. Topic-naming bodies are <2 KB in practice; the cap is a
 // defense-in-depth against a misbehaving local process flooding the main
@@ -66,6 +78,15 @@ export async function startLlmBridgeServer(): Promise<void> {
         return
       }
       if (req.method === 'POST' && req.url === '/llm/complete') {
+        // Auth — the worker reads the token from ELECTRON_LLM_BRIDGE_TOKEN
+        // and sends it in this header. Constant-time-ish compare via
+        // string equality is fine here: the token is 64 hex chars (256 bits)
+        // and an attacker on this machine can already read SQLite directly.
+        const provided = req.headers[LLM_BRIDGE_TOKEN_HEADER]
+        if (typeof provided !== 'string' || provided !== getBridgeToken()) {
+          sendJson(res, 401, { ok: false, error: 'unauthorized' })
+          return
+        }
         const body = await readBody(req)
         let parsed: LlmCompleteRequest
         try {

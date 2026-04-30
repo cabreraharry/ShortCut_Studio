@@ -8,6 +8,7 @@ import { initErrorsDb, closeErrorsDb } from './db/errorsConnection'
 import { runMigrations } from './db/migrations'
 import { startWorkerSupervisor, stopAllWorkers } from './workers/supervisor'
 import { startLlmBridgeServer, stopLlmBridgeServer } from './llm/bridgeServer'
+import { recordError } from './diagnostics/errorStore'
 import { initAuthState, verifyPersistedToken } from './execengine/authState'
 import { IpcChannel } from '@shared/ipc-channels'
 
@@ -49,7 +50,23 @@ async function bootstrap(): Promise<void> {
   // supervisor need the bridge port available in their env to make their
   // first call. AWAIT the listen callback so a fast-spawning worker doesn't
   // race the bind syscall and get ECONNREFUSED on its first request.
-  await startLlmBridgeServer()
+  //
+  // Failure here usually means the port is occupied by another process (a
+  // crashed previous instance, a VPN client, dev tooling). Workers still
+  // start so the rest of the app is usable, but topic generation will fail
+  // until the conflict is resolved + the app is restarted.
+  try {
+    await startLlmBridgeServer()
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    recordError({
+      source: 'main',
+      severity: 'error',
+      category: 'llm-bridge-startup',
+      message: `LLM bridge failed to start: ${message}`,
+      context: { likelyCause: 'port 45123 in use by another process' }
+    })
+  }
   startWorkerSupervisor()
   // Fire-and-forget: confirm any persisted token is still valid against SIS.
   // We don't block boot on this — UI surfaces 'connected' optimistically and

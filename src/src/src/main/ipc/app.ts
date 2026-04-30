@@ -1,6 +1,7 @@
-import { app, ipcMain, shell } from 'electron'
+import { app, ipcMain } from 'electron'
 import { IpcChannel } from '@shared/ipc-channels'
 import type { LoginItemSettings } from '@shared/types'
+import { safeOpenExternal } from '../security/safeUrl'
 
 const HIDDEN_ARG = '--hidden'
 
@@ -28,7 +29,9 @@ export function registerAppHandlers(): void {
   })
 
   ipcMain.handle(IpcChannel.AppOpenExternal, async (_evt, url: string) => {
-    await shell.openExternal(url)
+    // Scheme allowlist (https/http only) — see security/safeUrl.ts. Renderer
+    // callers get a quiet boolean; details land in the Errors panel.
+    await safeOpenExternal(url)
   })
 
   ipcMain.handle(IpcChannel.AppGetVersion, () => app.getVersion())

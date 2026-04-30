@@ -1,4 +1,5 @@
 import { net } from 'electron'
+import { redactSecrets } from '../security/redact'
 
 // Discovery is a single GET per provider that doubles as auth validation:
 // a successful response means the credential is valid AND we have a fresh
@@ -73,7 +74,7 @@ async function discoverOllama(input: DiscoverInput): Promise<DiscoveredModels> {
   const host = trimHost(input.apiHost) || 'http://127.0.0.1:11434'
   const r = await rawFetch({ url: `${host}/api/tags`, method: 'GET' })
   if (r.status === 0) throw new Error('Ollama unreachable — is the daemon running?')
-  if (r.status >= 400) throw new Error(`Ollama HTTP ${r.status}: ${r.body.slice(0, 200)}`)
+  if (r.status >= 400) throw new Error(`Ollama HTTP ${r.status}: ${redactSecrets(r.body.slice(0, 200))}`)
   const parsed = JSON.parse(r.body) as { models?: Array<{ name: string }> }
   const models = (parsed.models ?? []).map((m) => m.name).filter(Boolean)
   return { models, defaultModel: models[0] }
@@ -88,7 +89,7 @@ async function discoverOpenAI(input: DiscoverInput): Promise<DiscoveredModels> {
     headers: { Authorization: `Bearer ${input.apiKey}` }
   })
   if (r.status === 401 || r.status === 403) throw new AuthFailedError('OpenAI: auth failed')
-  if (r.status >= 400) throw new Error(`OpenAI HTTP ${r.status}: ${r.body.slice(0, 200)}`)
+  if (r.status >= 400) throw new Error(`OpenAI HTTP ${r.status}: ${redactSecrets(r.body.slice(0, 200))}`)
   const parsed = JSON.parse(r.body) as { data?: Array<{ id: string }> }
   const all = (parsed.data ?? []).map((m) => m.id)
   // Filter to chat-capable model families. OpenAI returns embeddings + audio
@@ -126,7 +127,7 @@ async function discoverClaude(input: DiscoverInput): Promise<DiscoveredModels> {
       fallback: true
     }
   }
-  if (r.status >= 400) throw new Error(`Claude HTTP ${r.status}: ${r.body.slice(0, 200)}`)
+  if (r.status >= 400) throw new Error(`Claude HTTP ${r.status}: ${redactSecrets(r.body.slice(0, 200))}`)
   const parsed = JSON.parse(r.body) as { data?: Array<{ id: string }> }
   const models = (parsed.data ?? []).map((m) => m.id)
   const defaultModel =
@@ -168,7 +169,7 @@ async function discoverHuggingFace(input: DiscoverInput): Promise<DiscoveredMode
     throw new AuthFailedError('HuggingFace: auth failed')
   }
   if (auth.status >= 400 && auth.status !== 404) {
-    throw new Error(`HuggingFace HTTP ${auth.status}: ${auth.body.slice(0, 200)}`)
+    throw new Error(`HuggingFace HTTP ${auth.status}: ${redactSecrets(auth.body.slice(0, 200))}`)
   }
   // Try the OpenAI-compatible listing first; if it returns useful rows, use
   // them. Otherwise fall back to the curated list. Either path constitutes a
@@ -199,7 +200,7 @@ async function discoverLmStudio(input: DiscoverInput): Promise<DiscoveredModels>
   const host = trimHost(input.apiHost) || 'http://localhost:1234/v1'
   const r = await rawFetch({ url: `${host}/models`, method: 'GET' })
   if (r.status === 0) throw new Error('LM Studio unreachable — is the local server running?')
-  if (r.status >= 400) throw new Error(`LM Studio HTTP ${r.status}: ${r.body.slice(0, 200)}`)
+  if (r.status >= 400) throw new Error(`LM Studio HTTP ${r.status}: ${redactSecrets(r.body.slice(0, 200))}`)
   const parsed = JSON.parse(r.body) as { data?: Array<{ id: string }> }
   const models = (parsed.data ?? []).map((m) => m.id).filter(Boolean)
   return { models, defaultModel: models[0] }
@@ -216,7 +217,7 @@ async function discoverGemini(input: DiscoverInput): Promise<DiscoveredModels> {
     headers: { 'x-goog-api-key': input.apiKey }
   })
   if (r.status === 401 || r.status === 403) throw new AuthFailedError('Gemini: auth failed')
-  if (r.status >= 400) throw new Error(`Gemini HTTP ${r.status}: ${r.body.slice(0, 200)}`)
+  if (r.status >= 400) throw new Error(`Gemini HTTP ${r.status}: ${redactSecrets(r.body.slice(0, 200))}`)
   const parsed = JSON.parse(r.body) as {
     models?: Array<{ name: string; supportedGenerationMethods?: string[] }>
   }

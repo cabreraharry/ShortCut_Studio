@@ -387,6 +387,18 @@ function WorkerRow({
           <div className="font-mono text-xs font-semibold">{worker.name}</div>
           <div className="text-xs text-muted-foreground">
             status: <Badge variant="outline">{worker.status}</Badge>
+            {worker.status === 'running' && worker.lastHealthCheck && worker.lastHealthCheckOk === false && (
+              // Process is alive but the /health endpoint hasn't answered.
+              // Without this badge the row reads as "healthy" while the
+              // worker is actually hung — see lastHealthCheckOk in
+              // src/main/workers/supervisor.ts.
+              <Badge
+                variant="outline"
+                className="ml-2 border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+              >
+                no recent OK ping
+              </Badge>
+            )}
             {worker.restartCount > 0 && (
               <span className="ml-2">restarts: {worker.restartCount}</span>
             )}

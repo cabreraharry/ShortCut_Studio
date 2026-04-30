@@ -89,6 +89,13 @@ function projectRootDir(): string | null {
   return resolve(__dirname, '../..')
 }
 
+// Tables that contain user-supplied secrets — API keys, usage records that
+// could fingerprint workflows. The dev SQL console is a power-user tool
+// gated behind Ctrl+Shift+D, but it's also the path of least resistance for
+// "show me everything in this table" → screen recording → key in someone
+// else's hands. Block at the SELECT level.
+const SECRET_TABLES = ['LLM_Provider', 'LLM_Usage']
+
 function validateSelectSql(sql: string): { ok: boolean; error?: string; query?: string } {
   const trimmed = sql.trim().replace(/;+\s*$/, '')
   if (!trimmed) return { ok: false, error: 'query is empty' }
@@ -111,6 +118,14 @@ function validateSelectSql(sql: string): { ok: boolean; error?: string; query?: 
   }
   if (/^\s*PRAGMA\b/i.test(trimmed) && /=/.test(trimmed)) {
     return { ok: false, error: 'PRAGMA writes (with `=`) are not allowed' }
+  }
+  for (const table of SECRET_TABLES) {
+    if (new RegExp(`\\b${table}\\b`, 'i').test(trimmed)) {
+      return {
+        ok: false,
+        error: `${table} contains secrets and is blocked from the dev SQL console`
+      }
+    }
   }
   return { ok: true, query: trimmed }
 }
