@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AppShell } from './components/layout/AppShell'
+import { RouteErrorBoundary } from './components/layout/RouteErrorBoundary'
 import { Toaster } from './components/ui/toaster'
 import { TooltipProvider } from './components/ui/tooltip'
 import DashboardPage from './features/dashboard/DashboardPage'
@@ -23,6 +24,7 @@ export default function App() {
     <TooltipProvider delayDuration={300} skipDelayDuration={100}>
       <AppShell>
         <FirstRunGuard>
+        <RouteErrorBoundary>
         <Routes>
           <Route path="/setup" element={<SetupWizard />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -39,6 +41,7 @@ export default function App() {
           <Route path="/about" element={<AboutPage />} />
           <Route path="/getting-started" element={<GettingStartedPage />} />
         </Routes>
+        </RouteErrorBoundary>
         </FirstRunGuard>
         <WelcomeOnLaunchDialog />
         <Toaster />

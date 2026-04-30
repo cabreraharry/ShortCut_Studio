@@ -18,7 +18,7 @@ const ROUTES: Route[] = [
   { hash: '#/folders',       label: 'Folders',       slug: 'folders' },
   { hash: '#/topics',        label: 'Topics',        slug: 'topics' },
   { hash: '#/insights',      label: 'Insights',      slug: 'insights' },
-  { hash: '#/knowledge-map', label: 'Knowledge Map', slug: 'knowledge-map' },
+  { hash: '#/topic-map',     label: 'Topic Map',     slug: 'topic-map' },
   { hash: '#/community',     label: 'Community',     slug: 'community' },
   { hash: '#/filters',       label: 'Filters',       slug: 'filters' },
   { hash: '#/privacy',       label: 'Privacy',       slug: 'privacy' },

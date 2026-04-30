@@ -27,6 +27,9 @@ import { ProviderHub } from '@/components/visual/ProviderHub'
 import { isLocalProvider } from '@shared/providers'
 import { USAGE_DASHBOARD_URL } from './dashboard-urls'
 import { OpenAiUsageInline } from './OpenAiUsageInline'
+import { SkeletonRows } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/visual/EmptyState'
+import { QueryErrorState } from '@/components/visual/QueryErrorState'
 
 const BRAND: Record<
   string,
@@ -127,13 +130,32 @@ function ProvidersList({
 }: {
   onOpenOnboarding: (guide: ProviderGuide) => void
 }) {
-  const { data: providers = [], isLoading } = useQuery({
+  const query = useQuery({
     queryKey: ['providers'],
     queryFn: () => api.llm.listProviders()
   })
 
-  if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading…</p>
+  if (query.isLoading) {
+    return <SkeletonRows count={3} />
+  }
+  if (query.isError) {
+    return (
+      <QueryErrorState
+        title="Couldn't load LLM providers"
+        error={query.error as Error}
+        onRetry={() => void query.refetch()}
+      />
+    )
+  }
+  const providers = query.data ?? []
+  if (providers.length === 0) {
+    return (
+      <EmptyState
+        variant="generic"
+        title="No providers configured"
+        description="Providers seed on first launch — if this list is empty, the migration may have failed. Check Settings → Errors."
+      />
+    )
   }
   return (
     <div className="space-y-3">

@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { toast } from '@/hooks/use-toast'
 import { EmptyState } from '@/components/visual/EmptyState'
+import { QueryErrorState } from '@/components/visual/QueryErrorState'
 import { SuperCategoryAtoms } from '@/components/visual/SuperCategoryAtoms'
 import { useBurst } from '@/components/visual/Burst'
 import { SkeletonRows, SkeletonChip } from '@/components/ui/skeleton'
@@ -34,10 +35,11 @@ function errMsg(err: unknown, fallback: string): string {
 }
 
 export default function TopicsPage() {
-  const { data: topicData } = useQuery({
+  const topicsQuery = useQuery({
     queryKey: ['topics'],
     queryFn: () => api.topics.list()
   })
+  const { data: topicData } = topicsQuery
   const { data: reviewItems = [] } = useQuery({
     queryKey: ['topicReview'],
     queryFn: () => api.topics.review()
@@ -52,6 +54,21 @@ export default function TopicsPage() {
   const hasReview = reviewItems.length > 0
   const scanDbMissing = topicData?.scanDbMissing ?? false
   const isEmpty = !hasTopics && !hasReview && !scanDbMissing
+
+  if (topicsQuery.isError) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Topics</h1>
+        </div>
+        <QueryErrorState
+          title="Couldn't load topics"
+          error={topicsQuery.error as Error}
+          onRetry={() => void topicsQuery.refetch()}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

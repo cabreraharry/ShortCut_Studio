@@ -1,6 +1,13 @@
 import type { ReactNode } from 'react'
 
-export type EmptyStateVariant = 'folders' | 'topics' | 'review' | 'search' | 'network' | 'generic'
+export type EmptyStateVariant =
+  | 'folders'
+  | 'topics'
+  | 'review'
+  | 'search'
+  | 'network'
+  | 'generic'
+  | 'error'
 
 export function EmptyState({
   variant = 'generic',
@@ -37,6 +44,8 @@ function Illustration({ variant }: { variant: EmptyStateVariant }): JSX.Element 
       return <SearchArt />
     case 'network':
       return <NetworkArt />
+    case 'error':
+      return <ErrorArt />
     default:
       return <GenericArt />
   }
@@ -155,6 +164,18 @@ function GenericArt(): JSX.Element {
     <Wrapper>
       <circle cx="60" cy="60" r="30" fill="hsl(var(--primary))" fillOpacity="0.2" stroke="hsl(var(--primary))" strokeOpacity="0.5" strokeWidth="2" />
       <circle cx="60" cy="60" r="14" fill="hsl(var(--primary))" fillOpacity="0.6" />
+    </Wrapper>
+  )
+}
+
+function ErrorArt(): JSX.Element {
+  return (
+    <Wrapper>
+      <g>
+        <circle cx="60" cy="60" r="30" fill="hsl(var(--destructive))" fillOpacity="0.15" stroke="hsl(var(--destructive))" strokeOpacity="0.5" strokeWidth="2" />
+        <line x1="60" y1="46" x2="60" y2="66" stroke="hsl(var(--destructive))" strokeWidth="3" strokeLinecap="round" />
+        <circle cx="60" cy="76" r="2.5" fill="hsl(var(--destructive))" />
+      </g>
     </Wrapper>
   )
 }

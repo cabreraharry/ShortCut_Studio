@@ -16,6 +16,7 @@ import { useRowSelection } from '@/hooks/use-row-selection'
 import { ErrorDialog } from '@/components/ui/error-dialog'
 import { DriveTree } from '@/components/drive-tree/DriveTree'
 import { EmptyState } from '@/components/visual/EmptyState'
+import { QueryErrorState } from '@/components/visual/QueryErrorState'
 import { SkeletonRows } from '@/components/ui/skeleton'
 import {
   Dialog,
@@ -199,10 +200,11 @@ function FileTypeChip({
 
 function FoldersCard() {
   const qc = useQueryClient()
-  const { data: folders = [], isLoading } = useQuery({
+  const foldersQuery = useQuery({
     queryKey: ['folders'],
     queryFn: () => api.folders.list()
   })
+  const { data: folders = [], isLoading, isError, error, refetch } = foldersQuery
 
   const addFromTree = useMutation({
     mutationFn: ({ path, action }: { path: string; action: 'include' | 'exclude' }) =>
@@ -357,6 +359,12 @@ function FoldersCard() {
         )}
         {isLoading ? (
           <SkeletonRows count={4} />
+        ) : isError ? (
+          <QueryErrorState
+            title="Couldn't load folders"
+            error={error as Error}
+            onRetry={() => void refetch()}
+          />
         ) : folders.length === 0 ? (
           <EmptyState
             variant="folders"

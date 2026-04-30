@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { HelpHint } from '@/components/ui/help-hint'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/visual/EmptyState'
+import { QueryErrorState } from '@/components/visual/QueryErrorState'
 import { api } from '@/lib/api'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { KnowledgeMapToolbar } from './KnowledgeMapToolbar'
@@ -20,11 +21,12 @@ export default function KnowledgeMapPage(): JSX.Element {
   const [superCategoryId, setSuperCategoryId] = useState<number | undefined>(undefined)
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  const { data: graph, isLoading } = useQuery({
+  const graphQuery = useQuery({
     queryKey: ['km', superCategoryId],
     queryFn: () => api.knowledgeMap.graph({ superCategoryId, sampleFilesPerTopic: 4 }),
     placeholderData: keepPreviousData
   })
+  const { data: graph, isLoading } = graphQuery
 
   // Clear selection when the graph changes shape (e.g., super-cat filter).
   useEffect(() => {
@@ -124,6 +126,12 @@ export default function KnowledgeMapPage(): JSX.Element {
             <div className="flex h-full items-center justify-center">
               <Skeleton className="h-[520px] w-[720px] rounded-lg" />
             </div>
+          ) : graphQuery.isError ? (
+            <QueryErrorState
+              title="Couldn't load the topic map"
+              error={graphQuery.error as Error}
+              onRetry={() => void graphQuery.refetch()}
+            />
           ) : !hasTopics ? (
             <EmptyState
               variant="topics"

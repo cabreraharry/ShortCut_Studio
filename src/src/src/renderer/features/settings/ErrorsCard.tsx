@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, AlertTriangle, ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -106,8 +107,22 @@ export function ErrorsCard(): JSX.Element {
   const total = data?.total ?? 0
   const hasMore = (page + 1) * PAGE_SIZE < total
 
+  // When the user navigates here via the sidebar's #errors anchor (set when
+  // the Settings nav has the "!" badge for a downed worker), scroll the card
+  // into view so they don't have to hunt for it.
+  //
+  // Uses react-router's useLocation so the scroll fires even when SettingsPage
+  // is already mounted and only the hash changes (NavLink doesn't re-mount the
+  // route in that case, so a [] dependency would miss the trigger).
+  const cardRef = useRef<HTMLDivElement | null>(null)
+  const location = useLocation()
+  useEffect(() => {
+    if (location.hash !== '#errors') return
+    cardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [location.hash])
+
   return (
-    <Card>
+    <Card ref={cardRef}>
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <CardTitle className="flex items-center gap-2">

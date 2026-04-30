@@ -27,6 +27,7 @@ import { useRowSelection } from '@/hooks/use-row-selection'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { toast } from '@/hooks/use-toast'
 import { EmptyState } from '@/components/visual/EmptyState'
+import { QueryErrorState } from '@/components/visual/QueryErrorState'
 import { ColorfulStat } from '@/components/visual/ColorfulStat'
 import { SkeletonRows } from '@/components/ui/skeleton'
 import type { DocumentInsight, InsightsGroup, InsightsSortKey, SortDirection } from '@shared/types'
@@ -39,13 +40,29 @@ export default function InsightsPage(): JSX.Element {
   const debouncedSearch = useDebouncedValue(search, 200)
   const [expandedFolder, setExpandedFolder] = useState<string | null>(null)
 
-  const { data: groups = [], isLoading: groupsLoading } = useQuery({
+  const groupsQuery = useQuery({
     queryKey: ['insights-groups', debouncedSearch],
     queryFn: () => api.insights.groups({ search: debouncedSearch }),
     placeholderData: keepPreviousData
   })
+  const { data: groups = [], isLoading: groupsLoading } = groupsQuery
 
   const overall = aggregateGroups(groups)
+
+  if (groupsQuery.isError) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Document insights</h1>
+        </div>
+        <QueryErrorState
+          title="Couldn't load insights"
+          error={groupsQuery.error as Error}
+          onRetry={() => void groupsQuery.refetch()}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

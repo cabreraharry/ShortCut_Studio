@@ -8,15 +8,17 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { PrivacyShield } from '@/components/visual/PrivacyShield'
+import { QueryErrorState } from '@/components/visual/QueryErrorState'
 import { HelpHint } from '@/components/ui/help-hint'
 import type { DbMode } from '@shared/types'
 
 export default function PrivacyPage() {
   const qc = useQueryClient()
-  const { data: terms = [] } = useQuery({
+  const termsQuery = useQuery({
     queryKey: ['privacy-terms'],
     queryFn: () => api.privacy.listTerms()
   })
+  const { data: terms = [] } = termsQuery
   const [userTerms, setUserTerms] = useState<string[]>([])
   const [newTerm, setNewTerm] = useState('')
 
@@ -44,6 +46,21 @@ export default function PrivacyPage() {
     const next = userTerms.filter((x) => x !== t)
     setUserTerms(next)
     persist.mutate(next)
+  }
+
+  if (termsQuery.isError) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Privacy</h1>
+        </div>
+        <QueryErrorState
+          title="Couldn't load privacy terms"
+          error={termsQuery.error as Error}
+          onRetry={() => void termsQuery.refetch()}
+        />
+      </div>
+    )
   }
 
   return (

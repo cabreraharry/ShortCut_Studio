@@ -153,10 +153,16 @@ export function Sidebar() {
             </div>
             {section.items.map(({ to, label, icon: Icon, tip }) => {
               const badge = badgeFor(to)
+              // Settings nav goes to the Errors anchor when the workers-down !
+              // badge is showing, so a click takes the user straight to the
+              // panel that explains the alert instead of dumping them on the
+              // Paths card with no context.
+              const navTo =
+                to === '/settings' && badge === '!' ? '/settings#errors' : to
               return (
                 <Tip key={to} content={tip}>
                   <NavLink
-                    to={to}
+                    to={navTo}
                     className={({ isActive }) =>
                       cn(
                         'group relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
@@ -200,8 +206,13 @@ export function Sidebar() {
       </nav>
       <div className="mt-auto border-t border-border/60 p-3 text-[10px] text-muted-foreground">
         <div className="flex items-center gap-1.5">
-          <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-          All systems nominal
+          <span
+            className={cn(
+              'inline-block h-1.5 w-1.5 animate-pulse rounded-full',
+              workersNeedAttention ? 'bg-amber-500' : 'bg-emerald-500'
+            )}
+          />
+          {workersNeedAttention ? 'Worker needs attention' : 'All systems nominal'}
         </div>
       </div>
     </aside>
