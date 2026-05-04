@@ -72,11 +72,17 @@ function LinkTile({ tone, icon, overline, title, blurb, onClick }: LinkTileProps
   const ringTone =
     tone === 'story' ? 'ring-primary/30 group-hover:ring-primary/60' : 'ring-amber-500/30 group-hover:ring-amber-500/60'
 
+  // The previous version put the click affordance on hover only — a small
+  // ArrowRight that animated from opacity-60 to 100 — so the tile didn't
+  // read as clickable until the user happened to mouse over it. Now the
+  // tile shows a persistent "Read →" footer and a `cursor-pointer` so the
+  // user knows it's a target before they hover.
+  const ctaLabel = tone === 'story' ? 'Read our story' : 'Read privacy notes'
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`group relative flex items-start gap-3 overflow-hidden rounded-xl bg-gradient-to-br p-4 text-left ring-1 transition-all hover:-translate-y-0.5 hover:shadow-md ${toneBg} ${ringTone}`}
+      className={`group relative flex cursor-pointer items-start gap-3 overflow-hidden rounded-xl bg-gradient-to-br p-4 text-left ring-1 transition-all hover:-translate-y-0.5 hover:shadow-md ${toneBg} ${ringTone}`}
     >
       <TileDecoration tone={tone} />
       <span
@@ -88,11 +94,12 @@ function LinkTile({ tone, icon, overline, title, blurb, onClick }: LinkTileProps
         <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           {overline}
         </div>
-        <div className="flex items-center gap-1 text-sm font-semibold">
-          {title}
-          <ArrowRight className="h-3 w-3 translate-x-0 opacity-60 transition-transform group-hover:translate-x-0.5 group-hover:opacity-100" />
-        </div>
+        <div className="text-sm font-semibold">{title}</div>
         <div className="mt-0.5 truncate text-xs text-muted-foreground">{blurb}</div>
+        <div className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-semibold text-primary">
+          {ctaLabel}
+          <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+        </div>
       </div>
     </button>
   )

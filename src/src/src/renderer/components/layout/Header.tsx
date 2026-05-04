@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Moon, Sun, Activity, HelpCircle, Sparkles } from 'lucide-react'
 import { IconButton } from '@/components/ui/icon-button'
+import { badgeVariants } from '@/components/ui/badge'
 import { Tip } from '@/components/ui/cursor-tooltip'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
@@ -127,10 +128,17 @@ function UpdateAvailablePill(): JSX.Element | null {
 
   return (
     <Tip content={`v${status.availableVersion} is available — click for details`}>
+      {/* Apply badgeVariants directly to the <button> so the focus ring
+          aligns with the visible pill instead of floating around an outer
+          wrapper. The 'info' variant matches the previous amber styling. */}
       <button
         type="button"
         onClick={() => navigate('/settings')}
-        className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700 transition-colors hover:bg-amber-500/20 dark:text-amber-400"
+        aria-label="Update ready"
+        className={cn(
+          badgeVariants({ variant: 'info' }),
+          'gap-1 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider hover:bg-amber-500/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+        )}
       >
         <Sparkles className="h-3 w-3" />
         Update ready

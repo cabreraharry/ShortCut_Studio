@@ -9,8 +9,6 @@ import {
   CheckCircle2,
   Clock,
   FileStack,
-  Cpu,
-  Users,
   Hourglass,
   FolderPlus
 } from 'lucide-react'
@@ -18,6 +16,7 @@ import { useNavigate } from 'react-router-dom'
 import { EmptyState } from '@/components/visual/EmptyState'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { HelpHint, WithHint } from '@/components/ui/help-hint'
 import { api } from '@/lib/api'
@@ -27,8 +26,8 @@ import { ProgressGlass } from './ProgressGlass'
 import { TimeRangeBar } from './TimeRangeBar'
 import { DedupCard } from './DedupCard'
 import { HoursSavedCard } from './HoursSavedCard'
-import { DashboardHeroBanner } from '@/components/visual/HeroBanner'
 import { DashboardWelcomeHero } from './DashboardWelcomeHero'
+import { CelebrationBanner } from './CelebrationBanner'
 import { NetworkCard } from './NetworkCard'
 import { ColorfulStat } from '@/components/visual/ColorfulStat'
 import { ActivityTicker } from '@/components/visual/ActivityTicker'
@@ -47,18 +46,18 @@ const ARTIFACT_LABELS: Record<
     hint: "Files whose text has been pulled out of the PDF/EPUB. Real count from SCLFolder: matches files where Words500 was filled at some point OR Probability is set (the column may be cleared after Gemini consumes it)."
   },
   llm: {
-    short: 'LLM',
-    long: 'AI summary generated',
+    short: 'AI',
+    long: 'AI summary',
     hint: 'Files where Gemini has run on the extracted text (Files.Probability > 0 in SCLFolder). Real count.'
   },
   references: {
-    short: 'References',
-    long: 'Citation list extracted (estimated)',
+    short: 'Refs',
+    long: 'References',
     hint: "SCL_Demo doesn't track citation parsing as a separate column yet, so this stage is estimated as `LLM × 0.55 / 0.72`. The 'Estimated' badge on the bottle header makes this visible to users."
   },
   km: {
-    short: 'KM',
-    long: 'Added to Knowledge Map',
+    short: 'Topics',
+    long: 'Topics',
     hint: 'Files joined to a topic in the TopicFiles table. Real count — will sit at 0% until topic generation has run on this library.'
   }
 }
@@ -66,9 +65,9 @@ const ARTIFACT_LABELS: Record<
 function EstimatedBadge(): JSX.Element {
   return (
     <WithHint label="This stage doesn't have its own column in SCL_Demo's Files table yet. The number is derived from the LLM count by a fixed coefficient (0.55 / 0.72) so the bottle still shows something visually — it'll be replaced with a real count once SCL_Demo's pipeline writes a citations-parsed signal.">
-      <span className="inline-flex cursor-help items-center rounded-sm border border-amber-500/40 bg-amber-500/15 px-1 py-0 text-[9px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+      <Badge variant="info" className="cursor-help px-1 py-0 text-[9px] uppercase tracking-wider">
         Est
-      </span>
+      </Badge>
     </WithHint>
   )
 }
@@ -107,7 +106,11 @@ function ArtifactTabs({
                   : 'border-transparent text-muted-foreground hover:bg-accent/40 hover:text-foreground'
               )}
             >
-              {ARTIFACT_LABELS[t].short}
+              {/* Long label on ≥sm screens, short on mobile — gives users an actual
+                  word ('Topics' beats 'KM') without breaking the tab strip on
+                  narrow layouts. */}
+              <span className="hidden sm:inline">{ARTIFACT_LABELS[t].long}</span>
+              <span className="sm:hidden">{ARTIFACT_LABELS[t].short}</span>
             </button>
           </WithHint>
         )
@@ -184,18 +187,19 @@ export default function DashboardPage() {
   }, [summary, allTimeTotalPct, fireMilestone])
 
   // First-run empty state: no folders configured AND no scan data. Replace
-  // the bottle cards (which would all be zero) with a welcome card pointing
-  // at the Folders page so the user knows what the next step is. Refresh
-  // re-evaluates this condition automatically once a folder gets added.
+  // the dashboard with a single CTA pointing at Folders so the next step is
+  // above the fold on a 1366×768 laptop. Refresh re-evaluates this condition
+  // automatically once a folder gets added.
   const isFirstRun = folders.length === 0 && (summary?.totalFiles ?? 0) === 0
 
   if (isFirstRun) {
     return (
       <div className="space-y-6">
-        <DashboardWelcomeHero />
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Your library at a glance — once there's a library to glance at.</p>
+          <p className="text-sm text-muted-foreground">
+            Your library at a glance — once there's a library to glance at.
+          </p>
         </div>
         <EmptyState
           variant="folders"
@@ -212,10 +216,21 @@ export default function DashboardPage() {
     )
   }
 
+  const processedTotal = stageLocal + stagePeer
+  // The celebration banner tracks the user's overall library completion,
+  // NOT the currently-selected artifact tab. If we keyed off `processedTotal`
+  // (stage-specific), switching tabs would re-fire the banner because
+  // different stages report different counts — the user could end up
+  // dismissing it once per tab. Use the all-stages totals from `summary`.
+  const summaryProcessed = (summary?.processedLocal ?? 0) + (summary?.processedPeer ?? 0)
+
   return (
     <div className="space-y-6">
+      <CelebrationBanner
+        totalFiles={summary?.totalFiles ?? 0}
+        processedTotal={summaryProcessed}
+      />
       <DashboardWelcomeHero />
-      <DashboardHeroBanner />
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
         <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -255,7 +270,7 @@ export default function DashboardPage() {
             <ArtifactTabs active={artifactTab} onChange={setArtifactTab} />
             <HelpHint
               size="xs"
-              label="Each tab is a stage of processing. Scan / LLM / KM read distinct columns from SCL_Demo's Files table — switching tabs changes both the percent AND the raw 'X / Y' count. References has no real column yet, so it's marked 'Estimated' on the bottle header."
+              label="Each tab is a stage of processing. Scan / AI / Topics read distinct columns from SCL_Demo's Files table — switching tabs changes both the percent AND the raw 'X / Y' count. References has no real column yet, so it's marked 'Estimated' on the bottle header."
             />
           </div>
           <div className="flex flex-row items-start gap-6">
@@ -270,9 +285,10 @@ export default function DashboardPage() {
               </h3>
               <div className="relative">
                 <ProgressGlass
+                  variant="absolute"
                   localPct={allTimeLocalPct}
                   peerPct={allTimePeerPct}
-                  totalLabel={byStage ? `${formatNumber(stageLocal + stagePeer)} / ${formatNumber(total)}` : 'Loading…'}
+                  totalLabel={byStage ? `${formatNumber(processedTotal)} / ${formatNumber(total)}` : 'Loading…'}
                 />
                 {milestoneBurst}
               </div>
@@ -283,10 +299,11 @@ export default function DashboardPage() {
                 {isEstimated && <EstimatedBadge />}
                 <HelpHint
                   size="xs"
-                  label="Same totals as the left bottle but split into 'Before window' (blue, what was already done before this range started) and 'Δ this window' (teal, the change during the range). Per-stage deltas are scaled proportionally; real per-stage history lands when ProgressSnapshots is wired (v1.5)."
+                  label="Same totals as the left bottle but split into 'Before window' (muted, what was already done before this range started) and 'Δ this window' (primary, the change during the range). Different colours from the left bottle so the two are not mistaken for each other. Per-stage deltas are scaled proportionally; real per-stage history lands when ProgressSnapshots is wired (v1.5)."
                 />
               </h3>
               <ProgressGlass
+                variant="delta"
                 localPct={baselinePct}
                 peerPct={deltaTotalPct}
                 totalLabel={byStage ? `+${formatNumber(stageDeltaLocal + stageDeltaPeer)} this window` : 'Loading…'}
@@ -302,31 +319,26 @@ export default function DashboardPage() {
               Progress — {summary?.rangeLabel ?? 'Loading…'}
               <HelpHint
                 size="sm"
-                label="Numerical breakdown of the bottles on the left. 'Total files' and 'Processed locally' are real counts from SCL_Demo's Files table; 'From peers' is always 0 (peer data not wired yet); 'Remaining' = total − processed."
+                label="Numerical breakdown of the bottles on the left. 'Total files' is real (read from SCLFolder's Files table); 'Remaining' = total − processed."
               />
             </CardTitle>
-            <CardDescription>
-              Local counts are real (read from SCLFolder DB). Peer / range deltas / ETA are still synthetic until ExecEngine ships its peer layer + ProgressSnapshots is populated.
+            <CardDescription className="flex items-center gap-1.5">
+              Local counts are real, read live from your scan database.
+              <HelpHint
+                size="xs"
+                label="Peer counts, range deltas, and ETA are still synthetic estimates until ExecEngine ships its peer layer and ProgressSnapshots is populated by a background timer (v1.5)."
+              />
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {summary ? (
               <>
+                {/* Trimmed to two stats — Processed Locally + From Peers were
+                    already rendered in the bottles to the left, and showing
+                    the same numbers twice triple-counted the user's working
+                    memory. The right-hand bottle's Δ shows the per-window
+                    change so the old delta block is also gone. */}
                 <StatGrid summary={summary} />
-                <div className="grid grid-cols-2 gap-4 rounded-md border border-border bg-card/40 p-4 text-xs">
-                  <Delta
-                    label="Δ local"
-                    value={summary.deltaLocal}
-                    tone="local"
-                    hint="Files processed by THIS PC during the selected range. Currently a synthetic estimate (per-range curve in mock.ts); v1.5 will compute it from real ProgressSnapshots history."
-                  />
-                  <Delta
-                    label="Δ peer"
-                    value={summary.deltaPeer}
-                    tone="peer"
-                    hint="Files contributed by other peers during the range. Synthetic until the ExecEngine peer layer is live."
-                  />
-                </div>
                 {summary.etaDays !== undefined && (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Clock className="h-3 w-3" />
@@ -361,7 +373,7 @@ export default function DashboardPage() {
               label="Background work currently running on this PC: scans, AI topic generation, classification. Currently shows synthetic mock entries until SCL_Demo workers report real job state via the supervisor's worker_api channel."
             />
           </CardTitle>
-          <CardDescription>Background work in flight. Click a job to view its log.</CardDescription>
+          <CardDescription>Background work in flight.</CardDescription>
         </CardHeader>
         <CardContent>
           {jobs.length === 0 ? (
@@ -388,21 +400,11 @@ function StatGrid({
 }: {
   summary: {
     totalFiles: number
-    processedLocal: number
-    processedPeer: number
     remaining: number
-    deltaLocal: number
-    deltaPeer: number
   }
 }) {
-  const localTrend = summary.processedLocal > 0
-    ? Math.round((summary.deltaLocal / summary.processedLocal) * 1000) / 10
-    : 0
-  const peerTrend = summary.processedPeer > 0
-    ? Math.round((summary.deltaPeer / summary.processedPeer) * 1000) / 10
-    : 0
   return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+    <div className="grid grid-cols-2 gap-4">
       <ColorfulStat
         label={
           <>
@@ -420,38 +422,6 @@ function StatGrid({
       <ColorfulStat
         label={
           <>
-            Processed locally
-            <HelpHint
-              size="xs"
-              label="Files THIS PC has processed for the active stage (Files.Probability > 0). Read directly from the SCLFolder DB on every refresh."
-            />
-          </>
-        }
-        value={formatNumber(summary.processedLocal)}
-        tone="local"
-        icon={<Cpu className="h-4 w-4" />}
-        trendPct={localTrend}
-        trendLabel="this range"
-      />
-      <ColorfulStat
-        label={
-          <>
-            From peers
-            <HelpHint
-              size="xs"
-              label="Files processed by other community members and shared back to you. Always 0 until ExecEngine's peer layer ships."
-            />
-          </>
-        }
-        value={formatNumber(summary.processedPeer)}
-        tone="peer"
-        icon={<Users className="h-4 w-4" />}
-        trendPct={peerTrend}
-        trendLabel="this range"
-      />
-      <ColorfulStat
-        label={
-          <>
             Remaining
             <HelpHint
               size="xs"
@@ -463,34 +433,6 @@ function StatGrid({
         tone="warning"
         icon={<Hourglass className="h-4 w-4" />}
       />
-    </div>
-  )
-}
-
-function Delta({
-  label,
-  value,
-  tone,
-  hint
-}: {
-  label: string
-  value: number
-  tone: 'local' | 'peer'
-  hint?: string
-}) {
-  return (
-    <div>
-      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-        {label}
-        {hint && <HelpHint size="xs" label={hint} />}
-      </div>
-      <div
-        className={`mt-1 font-mono text-lg font-semibold ${
-          tone === 'local' ? 'text-glass-local' : 'text-glass-peer'
-        }`}
-      >
-        +{formatNumber(value)}
-      </div>
     </div>
   )
 }
@@ -526,9 +468,9 @@ function JobRow({ job }: { job: Job }) {
         )}
         {job.error && <div className="mt-1 text-xs text-destructive">{job.error}</div>}
       </div>
-      <Button variant="ghost" size="sm">
-        log
-      </Button>
+      {/* Job log viewer doesn't exist yet (v1.5). Until it ships, the row is
+          informational only — the previous "log" button + "Click a job to
+          view its log" copy promised a click target that did nothing. */}
     </div>
   )
 }

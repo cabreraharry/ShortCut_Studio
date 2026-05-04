@@ -5,6 +5,12 @@ interface ProgressGlassProps {
   peerPct: number        // 0-100, stacked above local
   totalLabel?: string
   labels?: { local?: string; peer?: string }
+  // 'absolute' (default): local-blue + peer-teal — the canonical "this PC vs.
+  // peer network" split.
+  // 'delta': muted-grey baseline + primary-tinted delta — used when the
+  // bottle represents "before window / Δ this window" so the user doesn't
+  // misread the same colors as meaning the same things in both bottles.
+  variant?: 'absolute' | 'delta'
 }
 
 const BUBBLES = [
@@ -15,11 +21,30 @@ const BUBBLES = [
   { cx: 115, delay: 3.3, dur: 6.3 }
 ]
 
-export function ProgressGlass({ localPct, peerPct, totalLabel, labels }: ProgressGlassProps) {
+export function ProgressGlass({
+  localPct,
+  peerPct,
+  totalLabel,
+  labels,
+  variant = 'absolute'
+}: ProgressGlassProps) {
   const uid = useId().replace(/:/g, '')
   const clipId = `glass-clip-${uid}`
   const localGradId = `local-grad-${uid}`
   const peerGradId = `peer-grad-${uid}`
+  // For the 'delta' variant the bottom layer is a neutral grey baseline
+  // (already-counted, de-emphasised) and the top layer is the in-window
+  // change in primary tone. Use `--muted-foreground` (~65% lightness in
+  // dark mode, ~47% in light) for the baseline rather than `--muted`,
+  // which is so close to the card background (~16% lightness in dark mode)
+  // that the bottle fill would be invisible. The legend swatches below use
+  // the same token at 50% opacity for a softer feel.
+  const localCssVar = variant === 'delta' ? 'var(--muted-foreground)' : 'var(--glass-local)'
+  const peerCssVar = variant === 'delta' ? 'var(--primary)' : 'var(--glass-peer)'
+  const localSwatchClass = variant === 'delta' ? 'bg-muted-foreground/50' : 'bg-glass-local'
+  const peerSwatchClass = variant === 'delta' ? 'bg-primary' : 'bg-glass-peer'
+  const localStrokeClass = variant === 'delta' ? 'stroke-muted-foreground' : 'stroke-glass-local'
+  const peerStrokeClass = variant === 'delta' ? 'stroke-primary' : 'stroke-glass-peer'
   const { localY, localH, peerY, peerH, totalPct, liquidTop } = useMemo(() => {
     const clampedLocal = Math.max(0, Math.min(100, localPct))
     const clampedPeer = Math.max(0, Math.min(100 - clampedLocal, peerPct))
@@ -78,12 +103,12 @@ export function ProgressGlass({ localPct, peerPct, totalLabel, labels }: Progres
             />
           </clipPath>
           <linearGradient id={localGradId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="hsl(var(--glass-local))" stopOpacity="0.95" />
-            <stop offset="100%" stopColor="hsl(var(--glass-local))" stopOpacity="0.75" />
+            <stop offset="0%" stopColor={`hsl(${localCssVar})`} stopOpacity="0.95" />
+            <stop offset="100%" stopColor={`hsl(${localCssVar})`} stopOpacity="0.75" />
           </linearGradient>
           <linearGradient id={peerGradId} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="hsl(var(--glass-peer))" stopOpacity="0.95" />
-            <stop offset="100%" stopColor="hsl(var(--glass-peer))" stopOpacity="0.75" />
+            <stop offset="0%" stopColor={`hsl(${peerCssVar})`} stopOpacity="0.95" />
+            <stop offset="100%" stopColor={`hsl(${peerCssVar})`} stopOpacity="0.75" />
           </linearGradient>
         </defs>
 
@@ -109,7 +134,7 @@ export function ProgressGlass({ localPct, peerPct, totalLabel, labels }: Progres
               y1={peerY}
               x2="180"
               y2={peerY}
-              className="stroke-glass-peer"
+              className={peerStrokeClass}
               strokeWidth="1.5"
               strokeOpacity="0.6"
               style={{ transition: 'y1 600ms ease, y2 600ms ease' }}
@@ -133,7 +158,7 @@ export function ProgressGlass({ localPct, peerPct, totalLabel, labels }: Progres
               y1={localY}
               x2="180"
               y2={localY}
-              className="stroke-glass-local"
+              className={localStrokeClass}
               strokeWidth="1.5"
               strokeOpacity="0.6"
               style={{ transition: 'y1 600ms ease, y2 600ms ease' }}
@@ -226,11 +251,11 @@ export function ProgressGlass({ localPct, peerPct, totalLabel, labels }: Progres
       {/* Legend */}
       <div className="mt-2 flex justify-between gap-2 px-2 text-xs">
         <div className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-glass-local" />
+          <span className={`h-2.5 w-2.5 rounded-sm ${localSwatchClass}`} />
           <span className="text-muted-foreground">{labels?.local ?? 'Local'}</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="h-2.5 w-2.5 rounded-sm bg-glass-peer" />
+          <span className={`h-2.5 w-2.5 rounded-sm ${peerSwatchClass}`} />
           <span className="text-muted-foreground">{labels?.peer ?? 'Peer'}</span>
         </div>
       </div>

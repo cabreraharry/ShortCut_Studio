@@ -8,6 +8,8 @@ import {
   CheckCircle2
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { HelpHint } from '@/components/ui/help-hint'
 import { Tip } from '@/components/ui/cursor-tooltip'
 import { api } from '@/lib/api'
 import { cn, formatNumber } from '@/lib/utils'
@@ -34,8 +36,12 @@ export function NetworkCard(): JSX.Element {
           <NetworkIcon className="h-4 w-4" />
           Network &amp; databases
         </CardTitle>
-        <CardDescription>
-          Your link to the peer network and the local stores backing it. Synthetic data for the v1 demo — real values land when ExecEngine integration ships.
+        <CardDescription className="flex items-center gap-1.5">
+          Your link to the peer network and the local stores backing it.
+          <HelpHint
+            size="xs"
+            label="Currently synthetic data for the v1 demo — agent-hub status, peer counts, and pending CBR/CSCT/CDREQ pulls are mock values. Real values land when ExecEngine's HTTP/FastAPI consumer-peer layer ships in v2. Database files (right column) are read live from disk."
+          />
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -195,26 +201,17 @@ function PendingChip({
   kind: 'cbr' | 'csct' | 'cdreq'
   loading: boolean
 }): JSX.Element {
-  const tone =
-    kind === 'cbr'
-      ? 'border-glass-local/40 bg-glass-local/15 text-glass-local'
-      : kind === 'csct'
-        ? 'border-primary/40 bg-primary/15 text-primary'
-        : 'border-glass-peer/40 bg-glass-peer/15 text-glass-peer'
+  const variant: 'local' | 'accent' | 'peer' =
+    kind === 'cbr' ? 'local' : kind === 'csct' ? 'accent' : 'peer'
 
   return (
     <Tip content={REQUEST_DESCRIPTIONS[kind]}>
-      <span
-        className={cn(
-          'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[11px]',
-          tone
-        )}
-      >
+      <Badge variant={variant} className="gap-1.5 rounded-full font-mono text-[11px]">
         {label}
         <span className="font-semibold">
           {loading ? '…' : count ?? 0}
         </span>
-      </span>
+      </Badge>
     </Tip>
   )
 }
