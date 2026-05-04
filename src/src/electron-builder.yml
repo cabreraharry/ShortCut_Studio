@@ -45,20 +45,16 @@ extraResources:
       - zine_mappings.json
       - SCLFolder_Publ.db
       - SCLFolder_Priv.db
-  # Vendored decentralised-stack binaries. Fetched + extracted on demand by
-  # scripts/fetch-vendor-binaries.mjs (the build:win script chains through it
-  # automatically). IPFS Kubo provides the content-addressed P2P transport for
-  # peer file sharing; Nginx is the reverse proxy that the ExecEngine HTTP/
-  # FastAPI consumer-peer layer will sit behind. Both are bundled now even
-  # though the runtime features that consume them aren't fully wired — the
-  # architecture is decentralised-by-design and the installer is the right
-  # place to land them so v2 features ship without a second installer round.
-  - from: vendor/ipfs
-    to: extras/ipfs
-    filter: ['**/*']
-  - from: vendor/nginx
-    to: extras/nginx
-    filter: ['**/*']
+  # IPFS Kubo + Nginx are NOT bundled in the payload as of v0.5.0. They're
+  # required components — the web-stub installer downloads them from the
+  # canonical upstream hosts (dist.ipfs.tech, nginx.org) at install time,
+  # SHA-256-verifies, and extracts into resources/extras/{ipfs,nginx}. Keeps
+  # the .7z payload around 50–60 MB instead of ~140 MB. See
+  # docs/claude-handoff/ + .claude/plans/i-think-we-should-velvet-tide.md.
+  #
+  # Dev (`npm run dev`) and `build:unpack` still use scripts/fetch-vendor-
+  # binaries.mjs to populate vendor/{ipfs,nginx} on disk so developers don't
+  # have to round-trip through the stub.
 
 asarUnpack:
   - resources/**
@@ -66,7 +62,11 @@ asarUnpack:
 
 win:
   target:
-    - target: nsis
+    # nsis-web produces a small ~1–2 MB stub + a separate .7z payload + a
+    # .blockmap for differential updates. Stub size keeps the initial
+    # download tiny; payload is downloaded on demand by the stub or
+    # consumed locally if dropped next to the stub (offline / air-gap).
+    - target: nsis-web
       arch: [x64]
   icon: resources/icon.ico
   artifactName: ${productName}-Setup-${version}.${ext}
@@ -85,10 +85,20 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: ShortCut Studio
-  # Custom NSIS hooks: post-install prompt to open optional LLM tool download
-  # pages (Ollama, LM Studio). See build/installer.nsh for the macro.
+  # Block-map differential updates: the .blockmap file shipped next to the
+  # .7z lets the in-app updater fetch only the changed blocks for a new
+  # version instead of the full payload.
+  differentialPackage: true
+  # Custom NSIS hooks: web-stub manifest fetch, required-component download
+  # + verify + extract pass, optional silent-installer pass, post-install
+  # telemetry POST. See build/installer.nsh.
   include: build/installer.nsh
 
+# Update channel — read by the in-app updater (Phase 4) and by the stub
+# (Phase 2) when checking for new versions. The actual S3 bucket /
+# CloudFront distribution is provisioned by infra/aws/ (Phase 3); this
+# placeholder URL keeps electron-builder happy until then.
 publish:
   provider: generic
-  url: https://example.invalid/updates/
+  url: https://updates.shortcutstudio.invalid/v1/
+  channel: stable

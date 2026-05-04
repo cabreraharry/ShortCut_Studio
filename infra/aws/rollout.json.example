@@ -1,0 +1,6 @@
+{
+  "_comment": "Uploaded to s3://<bucket>/meta/rollout.json. The manifest Lambda reads this file (cached briefly via CloudFront) and routes a percentile of installId-bearing requests to the staged channel. Set stagedPercent: 0 (or delete the file) to disable staged rollout.",
+  "stagedChannel": "beta",
+  "stagedPercent": 10,
+  "_note": "stagedPercent must be an integer between 0 and 100. The Lambda uses sha256(installId) % 100 < stagedPercent to decide. Same installId always lands in the same bucket — no flapping."
+}

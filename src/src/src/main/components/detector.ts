@@ -3,18 +3,21 @@ import { join } from 'node:path'
 import { app, net } from 'electron'
 import {
   COMPONENTS,
-  type ComponentStatus,
-  type OptionalComponent
+  type Component,
+  type ComponentStatus
 } from '@shared/components-manifest'
 
-// Detect whether each optional component is present + give a one-line detail
-// for the UI. Two strategies:
-//   - bundled: probe sentinel file under process.resourcesPath/<resourceSubpath>
-//     (in dev mode the path doesn't exist, so report 'absent').
-//   - external: probe the daemon port on localhost. We don't probe the install
-//     path because what matters at runtime is "is the server running" — a user
-//     might have Ollama installed but not running, in which case scan calls
-//     will still fail.
+// Detect whether each component is present + give a one-line detail for
+// the UI. Strategy is chosen by `kind`, not `category`:
+//   - 'zip-extract'      probe sentinel file under
+//                        process.resourcesPath/<resourceSubpath> (dev mode
+//                        has no resources tree, so report 'unknown').
+//   - 'silent-installer' probe the daemon's localhost port. We don't check
+//                        the install path because what matters at runtime
+//                        is "is the daemon running" — a user might have
+//                        Ollama installed but not running, in which case
+//                        scan calls fail anyway.
+//   - 'external-link'    same as silent-installer (port probe only).
 
 const PORT_PROBE_TIMEOUT_MS = 1500
 
@@ -26,16 +29,21 @@ function bundledExtraDir(): string | null {
   return process.resourcesPath
 }
 
-function probeBundledSentinel(component: OptionalComponent): ComponentStatus {
+function probeBundledSentinel(component: Component): ComponentStatus {
   const base = bundledExtraDir()
   if (!base || !component.resourceSubpath || !component.sentinelFile) {
     return { ...component, installState: 'unknown', detail: 'Dev mode — bundle path not applicable' }
   }
   const sentinel = join(base, component.resourceSubpath, component.sentinelFile)
   if (existsSync(sentinel)) {
-    return { ...component, installState: 'present', detail: 'Bundled — installed' }
+    const detail = component.category === 'required' ? 'Required — installed' : 'Installed'
+    return { ...component, installState: 'present', detail }
   }
-  return { ...component, installState: 'absent', detail: 'Removed at install (re-add below)' }
+  const detail =
+    component.category === 'required'
+      ? 'Missing — use Repair install'
+      : 'Not installed (add below)'
+  return { ...component, installState: 'absent', detail }
 }
 
 async function probeLocalPort(port: number): Promise<boolean> {
@@ -73,7 +81,7 @@ async function probeLocalPort(port: number): Promise<boolean> {
   })
 }
 
-async function probeExternal(component: OptionalComponent): Promise<ComponentStatus> {
+async function probeExternal(component: Component): Promise<ComponentStatus> {
   if (!component.detectPort) {
     return { ...component, installState: 'unknown', detail: 'No detection configured' }
   }
@@ -94,6 +102,6 @@ async function probeExternal(component: OptionalComponent): Promise<ComponentSta
 
 export async function detectAllComponents(): Promise<ComponentStatus[]> {
   return Promise.all(
-    COMPONENTS.map((c) => (c.category === 'bundled' ? probeBundledSentinel(c) : probeExternal(c)))
+    COMPONENTS.map((c) => (c.kind === 'zip-extract' ? probeBundledSentinel(c) : probeExternal(c)))
   )
 }

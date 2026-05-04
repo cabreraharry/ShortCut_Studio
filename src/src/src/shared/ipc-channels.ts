@@ -131,7 +131,13 @@ export const IpcChannel = {
 
   // Optional components (IPFS, Nginx, Ollama, LM Studio)
   ComponentsList: 'components:list',
-  ComponentsInstall: 'components:install'
+  ComponentsInstall: 'components:install',
+
+  // In-app updater (web-stub installer redownload)
+  UpdaterStatus: 'updater:status',
+  UpdaterCheck: 'updater:check',
+  UpdaterApply: 'updater:apply',
+  UpdaterStatusChanged: 'updater:status-changed' // main → renderer event
 } as const
 
 export type IpcChannelName = (typeof IpcChannel)[keyof typeof IpcChannel]

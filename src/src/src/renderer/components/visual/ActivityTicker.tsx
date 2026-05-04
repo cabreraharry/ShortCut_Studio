@@ -92,7 +92,7 @@ export function ActivityTicker(): JSX.Element {
       { id: 's1', kind: 'peer', label: 'Peer node ah-7f2 joined the network' },
       { id: 's2', kind: 'topic', label: 'Topic "Diffusion Models" gained 3 new papers' },
       { id: 's3', kind: 'dedup', label: 'MasterID collision resolved for Attention_Is_All_You_Need.pdf' },
-      { id: 's4', kind: 'scan', label: 'Watchdog idle — 142 folders under observation' },
+      { id: 's4', kind: 'scan', label: 'Background scan idle — 142 folders ready' },
       { id: 's5', kind: 'classify', label: 'Queued 4 files for LLM classification' }
     ]
     return [...out, ...synthetic]

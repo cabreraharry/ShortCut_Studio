@@ -1,0 +1,14 @@
+# Local Terraform state — never commit
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate
+terraform.tfstate.*
+.terraform-build/
+
+# User-specific config
+terraform.tfvars
+*.auto.tfvars
+
+# Lambda build artifacts
+lambda/*/node_modules/
+lambda/*/package-lock.json

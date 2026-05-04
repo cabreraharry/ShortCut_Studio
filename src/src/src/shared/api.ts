@@ -53,6 +53,7 @@ import type {
   TopicDistribution,
   TopicListResult,
   TopicReviewItem,
+  UpdaterStatus,
   WorkerStatus
 } from './types'
 
@@ -206,6 +207,12 @@ export interface ElectronAPI {
   components: {
     list: () => Promise<ComponentStatus[]>
     install: (id: ComponentId) => Promise<void>
+  }
+  updater: {
+    status: () => Promise<UpdaterStatus>
+    check: () => Promise<UpdaterStatus>
+    apply: () => Promise<UpdaterStatus>
+    onStatusChanged: (cb: (status: UpdaterStatus) => void) => () => void
   }
 }
 

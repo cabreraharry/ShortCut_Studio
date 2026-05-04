@@ -149,8 +149,8 @@ async function installBundled(id: ComponentId): Promise<void> {
     throw new Error('Bundled-component install only available in packaged builds')
   }
   const component = getComponent(id)
-  if (!component || component.category !== 'bundled' || !component.vendorFetchKey) {
-    throw new Error(`Component ${id} is not a bundled component`)
+  if (!component || component.kind !== 'zip-extract' || !component.vendorFetchKey) {
+    throw new Error(`Component ${id} is not a zip-extract component with a vendor key`)
   }
   if (!component.resourceSubpath || !component.sentinelFile) {
     throw new Error(`Component ${id} missing resourceSubpath/sentinelFile`)
@@ -189,7 +189,36 @@ async function installBundled(id: ComponentId): Promise<void> {
 export async function installComponent(id: ComponentId): Promise<void> {
   const component = getComponent(id)
   if (!component) throw new Error(`Unknown component ${id}`)
-  if (component.category === 'external') {
+
+  // Required components are stub-managed. Until the in-app repair flow lands
+  // (which re-launches the stub with --repair), the only recovery path is
+  // re-running setup. The internal installBundled() download code is
+  // preserved for the future repair handler to call.
+  if (component.category === 'required') {
+    throw new Error(
+      `${component.displayName} is a required component managed by the installer. ` +
+        `Re-run the ShortCut Studio installer to repair.`
+    )
+  }
+
+  // Optional silent-installer components: the web-stub runs the .exe with
+  // `silentFlags` during install. From the long-lived Electron process we
+  // fall back to opening the vendor download page — running silent third-
+  // party installers from inside the running app is a separate hardening
+  // exercise (AV interactions, elevation prompts, exit-code handling).
+  if (component.category === 'optional' && component.kind === 'silent-installer') {
+    if (!component.externalUrl) {
+      throw new Error(`Component ${id} has no externalUrl fallback`)
+    }
+    const ok = await safeOpenExternal(component.externalUrl)
+    if (!ok) {
+      throw new Error(`Refused to open external URL for ${id} (scheme not allowed)`)
+    }
+    return
+  }
+
+  // External-link category: open the browser.
+  if (component.category === 'external-link') {
     if (!component.externalUrl) {
       throw new Error(`Component ${id} has no externalUrl`)
     }
@@ -199,5 +228,15 @@ export async function installComponent(id: ComponentId): Promise<void> {
     }
     return
   }
-  await installBundled(id)
+
+  // Optional zip-extract (no current entries; reserved for future bundled
+  // optionals): use the legacy runtime download path.
+  if (component.category === 'optional' && component.kind === 'zip-extract') {
+    await installBundled(id)
+    return
+  }
+
+  throw new Error(
+    `Component ${id}: no install path for category=${component.category} kind=${component.kind}`
+  )
 }

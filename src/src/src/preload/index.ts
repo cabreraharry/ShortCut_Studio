@@ -185,6 +185,17 @@ const api: ElectronAPI = {
   components: {
     list: () => ipcRenderer.invoke(IpcChannel.ComponentsList),
     install: (id) => ipcRenderer.invoke(IpcChannel.ComponentsInstall, id)
+  },
+  updater: {
+    status: () => ipcRenderer.invoke(IpcChannel.UpdaterStatus),
+    check: () => ipcRenderer.invoke(IpcChannel.UpdaterCheck),
+    apply: () => ipcRenderer.invoke(IpcChannel.UpdaterApply),
+    onStatusChanged: (cb) => {
+      const listener = (_e: Electron.IpcRendererEvent, status: import('@shared/types').UpdaterStatus) =>
+        cb(status)
+      ipcRenderer.on(IpcChannel.UpdaterStatusChanged, listener)
+      return () => ipcRenderer.removeListener(IpcChannel.UpdaterStatusChanged, listener)
+    }
   }
 }
 

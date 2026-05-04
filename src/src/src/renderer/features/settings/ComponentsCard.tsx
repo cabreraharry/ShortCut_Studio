@@ -43,7 +43,10 @@ export function ComponentsCard(): JSX.Element {
     mutationFn: (id: ComponentId) => api.components.install(id),
     onSuccess: (_data, id) => {
       const c = data?.find((x) => x.id === id)
-      if (c?.category === 'external') {
+      // Optional silent-installer fallback opens the vendor URL until the
+      // stub-driven silent install path lands. Show that as "opened page",
+      // not "installed", so the toast matches what the user actually sees.
+      if (c?.category === 'external-link' || c?.kind === 'silent-installer') {
         toast({ title: 'Opened download page', description: c.displayName })
       } else {
         toast({ title: 'Component installed', description: c?.displayName ?? id })
@@ -56,9 +59,21 @@ export function ComponentsCard(): JSX.Element {
   })
 
   const renderActionButton = (status: ComponentStatus): JSX.Element | null => {
+    // Required components are stub-managed. There's no in-app repair flow yet
+    // (re-launching the stub with --repair lands later); for now we just
+    // tell the user to re-run setup. Less misleading than a disabled button.
+    if (status.category === 'required') {
+      if (status.installState === 'present') return null
+      return (
+        <span className="text-xs text-muted-foreground">
+          Re-run setup to repair
+        </span>
+      )
+    }
     if (status.installState === 'present') return null
     const inflight = installMutation.isPending && installMutation.variables === status.id
-    if (status.category === 'external') {
+    // Optional silent-installer + external-link both currently open a URL.
+    if (status.kind === 'silent-installer' || status.category === 'external-link') {
       return (
         <Button
           size="sm"
@@ -70,6 +85,8 @@ export function ComponentsCard(): JSX.Element {
         </Button>
       )
     }
+    // Optional zip-extract — reserved for future entries; uses the runtime
+    // download path.
     return (
       <Button
         size="sm"
@@ -90,8 +107,9 @@ export function ComponentsCard(): JSX.Element {
           <Boxes className="h-4 w-4" /> Components
         </CardTitle>
         <CardDescription>
-          Optional bundles shipped with the installer (IPFS, Nginx) and detected third-party local
-          LLM tools (Ollama, LM Studio). Reinstall a missed bundle here without re-running setup.
+          Required components installed by the web-stub (IPFS, Nginx) and optional third-party
+          local LLM tools (Ollama, LM Studio). Required components are stub-managed; click "Repair
+          install" if any go missing. Optional ones can be added at any time.
         </CardDescription>
       </CardHeader>
       <CardContent>

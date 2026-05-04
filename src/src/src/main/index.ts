@@ -10,6 +10,7 @@ import { startWorkerSupervisor, stopAllWorkers } from './workers/supervisor'
 import { startLlmBridgeServer, stopLlmBridgeServer } from './llm/bridgeServer'
 import { recordError } from './diagnostics/errorStore'
 import { initAuthState, verifyPersistedToken } from './execengine/authState'
+import { startUpdater, stopUpdater } from './updater'
 import { IpcChannel } from '@shared/ipc-channels'
 
 let mainWindow: BrowserWindow | null = null
@@ -77,6 +78,11 @@ async function bootstrap(): Promise<void> {
   attachDevModeShortcut(mainWindow)
   createTray(mainWindow)
 
+  // In-app updater. No-op in dev (updater detects !app.isPackaged and just
+  // sets state to 'disabled-dev'). Runs the first manifest fetch ~30s after
+  // boot so the user's first-load isn't blocked on a network roundtrip.
+  startUpdater()
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       mainWindow = createMainWindow()
@@ -93,6 +99,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   markQuitting()
   destroyTray()
+  stopUpdater()
   stopAllWorkers()
   stopLlmBridgeServer()
   // Independent try/catch per DB so a throw in one (e.g. better-sqlite3 throws

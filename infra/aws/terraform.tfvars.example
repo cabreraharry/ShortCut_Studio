@@ -1,0 +1,28 @@
+# Copy this file to terraform.tfvars and edit for your AWS account.
+# terraform.tfvars is gitignored.
+
+aws_region  = "us-east-1"
+aws_profile = "default"
+
+project_name = "shortcutstudio"
+
+# v1 deployment: skip DNS / TLS, use default *.cloudfront.net + *.execute-api.*
+# hostnames. The deployment outputs `cloudfront_domain` + `api_endpoint` —
+# copy those into installer.nsh's MANIFEST_URL + the manifest's app.url after
+# `terraform apply`.
+manage_dns = false
+
+# Once you've registered shortcutstudio.app (or whatever) and delegated to
+# Route53 (a hosted zone for the apex domain must already exist), flip
+# manage_dns = true and fill these in.
+#
+# domain_name       = "updates.shortcutstudio.app"
+# route53_zone_name = "shortcutstudio.app"
+
+# Optional: email that receives CloudWatch alarm notifications. The first
+# alarm created is on the telemetry SQS DLQ — anything that lands there
+# means the events Lambda has been failing for 5+ retries on the same
+# message. Leave empty to skip SNS provisioning (the alarm still exists
+# in the AWS console; you just won't get emailed).
+#
+# alarm_email = "ops@example.com"

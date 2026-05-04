@@ -1,13 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Moon, Sun, Activity, HelpCircle } from 'lucide-react'
+import { Moon, Sun, Activity, HelpCircle, Sparkles } from 'lucide-react'
 import { IconButton } from '@/components/ui/icon-button'
 import { Tip } from '@/components/ui/cursor-tooltip'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { APP_VERSION, APP_BUILD_DATE } from '@/lib/app-info'
 import { AboutDialog } from './AboutDialog'
-import type { DataSource, DataSourceState } from '@shared/types'
+import type { DataSource, DataSourceState, UpdaterStatus } from '@shared/types'
 
 // Persist the theme toggle across restarts. Renderer-only state, so
 // localStorage is the right tool — no IPC roundtrip, no DB schema bump,
@@ -82,6 +83,7 @@ export function Header() {
         </div>
       </div>
       <div className="flex items-center gap-2">
+        <UpdateAvailablePill />
         <DataSourcePill />
         <IconButton
           tip="About ShortCut Studio"
@@ -98,6 +100,42 @@ export function Header() {
       </div>
       <AboutDialog open={aboutOpen} onOpenChange={setAboutOpen} />
     </header>
+  )
+}
+
+// Tiny pill that surfaces an "Update available" affordance from the header.
+// Hidden when the updater is idle / up-to-date / errored — only the
+// 'update-available' state shows it. Clicking jumps to Settings → Updates.
+function UpdateAvailablePill(): JSX.Element | null {
+  const navigate = useNavigate()
+  const qc = useQueryClient()
+  const { data: status } = useQuery<UpdaterStatus>({
+    queryKey: ['updater-status'],
+    queryFn: () => api.updater.status()
+  })
+
+  // Subscribe to push events from main so the header reacts to background
+  // checks without needing its own polling timer.
+  useEffect(() => {
+    const off = api.updater.onStatusChanged((next) => {
+      qc.setQueryData(['updater-status'], next)
+    })
+    return off
+  }, [qc])
+
+  if (status?.state !== 'update-available') return null
+
+  return (
+    <Tip content={`v${status.availableVersion} is available — click for details`}>
+      <button
+        type="button"
+        onClick={() => navigate('/settings')}
+        className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700 transition-colors hover:bg-amber-500/20 dark:text-amber-400"
+      >
+        <Sparkles className="h-3 w-3" />
+        Update ready
+      </button>
+    </Tip>
   )
 }
 

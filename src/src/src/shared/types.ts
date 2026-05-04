@@ -658,3 +658,30 @@ export interface RecordRendererErrorPayload {
   category?: string                 // e.g. route hash
   context?: Record<string, unknown>
 }
+
+// ---------------------------------------------------------------------------
+// Updater (web-stub redownload + handoff)
+// ---------------------------------------------------------------------------
+export type UpdaterState =
+  | 'idle'             // initial, no check yet
+  | 'disabled-dev'     // running unpackaged; updater is a no-op
+  | 'checking'         // manifest fetch in flight
+  | 'up-to-date'       // manifest version matches local
+  | 'update-available' // newer version found; awaiting user action
+  | 'downloading'      // stub binary download in flight
+  | 'ready'            // stub downloaded; ready to launch + handoff
+  | 'error'            // last operation failed; lastError set
+
+export interface UpdaterStatus {
+  state: UpdaterState
+  currentVersion: string
+  availableVersion: string | null
+  sizeBytes: number | null
+  lastCheckedAt: string | null
+  lastError: string | null
+  // Populated only while state === 'downloading'. downloadTotalBytes prefers
+  // the live Content-Length header over manifest.app.sizeBytes; null if the
+  // CDN doesn't report one.
+  downloadedBytes: number | null
+  downloadTotalBytes: number | null
+}

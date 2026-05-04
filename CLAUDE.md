@@ -112,10 +112,13 @@ npm install                # installs deps, runs electron-builder install-app-de
 npm run dev                # electron-vite dev — HMR for renderer, watch-rebuild for main/preload
 npm run typecheck          # both node + web TS projects
 npm run build              # electron-vite build → out/
-npm run build:win          # build + electron-builder --win (NSIS installer → release-builds/)
+npm run build:win          # build + electron-builder --win (nsis-web stub + payload → release-builds/nsis-web/)
+npm run publish:release    # uploads stub + payload + manifest to S3 + invalidates CloudFront
 npm test                   # vitest (unit)
 npm run test:e2e           # playwright (E2E against packaged-in-dir build)
 ```
+
+Full release recipe (channel selection, staged rollout, rollback): see [docs/release-process.md](docs/release-process.md).
 
 If `better-sqlite3` errors with "was compiled against a different Node.js version" on first run:
 
@@ -191,6 +194,18 @@ Pre-seeded LLM providers: Ollama (default, local), OpenAI, Claude, Gemini, Huggi
 
 A single `DbMode` ('publ' | 'priv') lives in the main process (`src/main/ipc/mode.ts`), toggled from the header. Views that care about mode refetch when it flips — React Query handles this via the `['mode']` key invalidation in `Header.tsx`. The actual per-mode DB (`SCLFolder_Publ.db` / `SCLFolder_Priv.db`) is SCL_Demo's — touched only through IPC handlers that route to the right connection.
 
+### Auto-update / release distribution (added v0.5.0)
+
+The installer changed from a self-contained NSIS bundle to a `nsis-web` two-piece — small ~800 KB stub + separate ~200 MB `.7z` payload — backed by an AWS-hosted manifest + payload distribution system. Components:
+
+- **Stub** ([build/installer.nsh](src/src/build/installer.nsh)) — wizard installer that downloads required components (IPFS Kubo, Nginx) from upstream CDNs at install time, **SHA-256-verifies** each download (via `certutil -hashfile`), and extracts to `resources/extras/`. Optional components (Ollama, LM Studio) get the same SHA-verify treatment when their installers are launched. Hashes are hardcoded as `!define IPFS_SHA256` etc. in the same file; bumping a component version means computing the new hash and updating both the `.nsh` define and the matching entry in [components-manifest.ts](src/src/src/shared/components-manifest.ts) + [fallback-manifest.json](src/src/build/fallback-manifest.json). A placeholder sentinel (`COMPONENT_SHA_PLACEHOLDER`) makes the install refuse to proceed if a maintainer forgets to fill the hash in.
+- **Manifest** — JSON shape defined by [src/shared/web-stub-manifest.ts](src/src/src/shared/web-stub-manifest.ts), served by an AWS Lambda from S3 + cached at CloudFront. Two channels (`stable`, `beta`) with hashmod-based percentage rollout (the Lambda hashes each request's `?installId=<hex>` and routes to the staged channel if `hash % 100 < stagedPercent`).
+- **In-app updater** ([src/main/updater/](src/src/src/main/updater/)) — checks the manifest every 6 h, compares SemVer, on user confirm downloads the stub to `%TEMP%`, **SHA-256-verifies** against `manifest.stub.sha256` (rejects + deletes on mismatch), launches detached, quits the app. Disabled in dev. State surfaced through [UpdatesCard.tsx](src/src/src/renderer/features/settings/UpdatesCard.tsx) in Settings.
+- **AWS infra** ([infra/aws/](infra/aws/)) — Terraform for S3 bucket, CloudFront distribution, manifest Lambda, telemetry Lambda + SQS, IAM publisher user. ~$5/mo at <10 k MAU.
+- **Publish pipeline** ([scripts/publish-release.mjs](src/src/scripts/publish-release.mjs)) — reads `release-builds/nsis-web/`, computes SHAs, renders manifest from [build/fallback-manifest.json](src/src/build/fallback-manifest.json) template, uploads + invalidates. [scripts/set-rollout.mjs](src/src/scripts/set-rollout.mjs) manages the staged-rollout percentage.
+
+The `infra/aws/` Terraform stack is for the **auto-updater** specifically. The IPFS bootstrap fleet + Cloudflare-fronted nginx static-JSON origin Erland's docs describe (for swarm-distributed payloads at scale) live in a separate top-level project at `D:\Client-Side_Project\IPFS_Nginx_Infra\` once that work begins.
+
 ## Coding Conventions
 
 - **TypeScript everywhere.** Strict mode. No `any` without comment.
@@ -252,6 +267,10 @@ When touching these, fix the root rather than working around it:
 
 19. **Dev SQL console blocks `LLM_Provider` and `LLM_Usage`** (added 2026-04-30 in v0.4.1). [ipc/dev.ts::validateSelectSql](src/src/src/main/ipc/dev.ts) rejects any query referencing those tables with a clear "blocked: contains secrets" error. Prevents accidental key leak via Ctrl+Shift+D → SQL tab → screen recording.
 
+20. **Auto-update / release distribution pipeline** (added 2026-05-02 for v0.5.0). The shipping format changed from a self-contained NSIS bundle to a `nsis-web` two-piece (~800 KB stub + ~200 MB `.7z` payload). Manifest is served by an AWS Lambda from S3 + cached at CloudFront with two-channel staged percentage rollout (`stable` / `beta`). All three SHA-256 verification gaps a code-reviewer flagged are fixed: (a) the in-app updater's [applyUpdate.ts::downloadStub](src/src/src/main/updater/applyUpdate.ts) now hashes the downloaded stub and refuses to launch on mismatch; (b) the NSIS [installer.nsh](src/src/build/installer.nsh) hashes every component-zip / silent-installer download via `certutil -hashfile` and refuses to extract or launch on mismatch; (c) hashes that have not been filled in for a release fail closed via the `COMPONENT_SHA_PLACEHOLDER` sentinel (secure by default — a maintainer who forgets to compute the new hash gets a build-fail at install time, not silent unverified install). Stub-launch verification uses Node's `crypto.createHash('sha256')` + a streaming read. NSIS-side uses the built-in `certutil.exe` which works in elevated `nsExec` contexts (PowerShell `Get-FileHash` does not). Required-component (IPFS/Nginx) hashes are `!define`d directly in `installer.nsh` next to URLs/versions; optional-component (Ollama/LM Studio) hashes are generated at build time by [scripts/fetch-optional-components.mjs](src/src/scripts/fetch-optional-components.mjs) into `build/component-shas.nsh` (gitignored), `!include`d unconditionally. `npm run build:win` chains `fetch-optional-components.mjs --ensure` so a placeholder file always exists pre-build (NSIS warning 7000 → electron-builder error otherwise). Bumping a version means updating the URL in `installer.nsh` + the matching entry in [components-manifest.ts](src/src/src/shared/components-manifest.ts) + [fallback-manifest.json](src/src/build/fallback-manifest.json) and re-running `npm run fetch-optional-components` to repopulate the SHAs.
+
+20a. **Updater hardening sweep** (added 2026-05-04 for v0.5.0). All seven follow-up concerns left by the original review are now closed: (a) `installId` is persisted to `<userData>/install-id` (16 random bytes → 32 hex) by [installId.ts](src/src/src/main/updater/installId.ts) and appended as `?installId=` on every manifest fetch — so staged rollout cohort assignment is stable per install; (b) the file write uses `flag: 'wx'` so two concurrent first-time runs both end up reading the winning value rather than overwriting each other (no `requestSingleInstanceLock` yet, so this matters); (c) [compareSemver](src/src/src/main/updater/manifest.ts) implements proper pre-release ordering per semver.org §11 (`1.0.0` > `1.0.0-rc.1` > `1.0.0-beta.2` > `1.0.0-beta.1`) so beta→stable migration auto-update fires; the split is at the FIRST `-` not `split('-', 2)` so `1.0.0-rc.1-hotfix` keeps its full pre-release identifier; (d) manifest fetch caps body at 64 KB, stub download caps at 16 MB (also rejects a too-large `Content-Length` upfront before streaming), events Lambda rejects POSTs over 8 KB before parsing — closes the OOM-via-malicious-CDN attack surface; (e) `applyUpdate.ts::downloadToFile` uses a single `abortAll` helper that sets `aborted=true` + `req.abort()` + `stream.destroy()` on every failure path including 4xx (previously the response body kept draining); the `'close'` listener is now attached up-front so a fast-drain write doesn't hang the Promise; partial stubs are deleted on every error path AND pre-cleaned before each download; (f) `onProgress` is plumbed end-to-end — main tracks `downloadedBytes` + `downloadTotalBytes` in `UpdaterStatus`, broadcasts at ≥200ms throttle, and [UpdatesCard.tsx](src/src/src/renderer/features/settings/UpdatesCard.tsx) renders a percentage bar; (g) [sqs.tf](infra/aws/sqs.tf) ships a CloudWatch metric alarm on `ApproximateNumberOfMessagesVisible >= 1` for the events DLQ + an optional SNS email subscription gated on the new `alarm_email` Terraform variable.
+
 ## Working with This Repo
 
 - **Always edit in `src/src/`.** No other code-bearing folder exists post-cleanup.
@@ -267,4 +286,11 @@ When touching these, fix the root rather than working around it:
 - [src/src/src/shared/api.ts](src/src/src/shared/api.ts) — full IPC surface typed
 - [src/src/src/main/ipc/index.ts](src/src/src/main/ipc/index.ts) — handler registration
 - [src/src/src/renderer/App.tsx](src/src/src/renderer/App.tsx) — route config
+- [docs/release-process.md](docs/release-process.md) — end-to-end recipe for cutting a v0.5.0+ release
+- [src/src/src/shared/web-stub-manifest.ts](src/src/src/shared/web-stub-manifest.ts) — manifest schema (single source of truth for the auto-updater)
+- [src/src/src/main/updater/](src/src/src/main/updater/) — in-app updater state machine + manifest fetch + apply
+- [src/src/build/installer.nsh](src/src/build/installer.nsh) — NSIS web-stub installer (component download + SHA-verify + extract)
+- [infra/aws/](infra/aws/) — Terraform stack for S3 + CloudFront + manifest/events Lambdas + SQS
+- [src/src/scripts/publish-release.mjs](src/src/scripts/publish-release.mjs) — release publish script (computes SHAs, uploads, invalidates)
+- [src/src/scripts/set-rollout.mjs](src/src/scripts/set-rollout.mjs) — staged-rollout percentage management
 - [_Docu/](_Docu/) — design PDFs + screenshots (owner-supplied)

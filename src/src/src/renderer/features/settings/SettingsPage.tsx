@@ -35,6 +35,7 @@ import { ExecEngineCard } from './ExecEngineCard'
 import { ErrorsCard } from './ErrorsCard'
 import { ComponentsCard } from './ComponentsCard'
 import { StartupCard } from './StartupCard'
+import { UpdatesCard } from './UpdatesCard'
 
 export default function SettingsPage() {
   return (
@@ -48,6 +49,7 @@ export default function SettingsPage() {
       </div>
       <PathsCard />
       <AdminCard />
+      <UpdatesCard />
       <StartupCard />
       <ExecEngineCard />
       <ComponentsCard />

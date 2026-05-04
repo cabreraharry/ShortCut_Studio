@@ -1,0 +1,75 @@
+{
+  "_comment": "Baked into the NSIS stub via the File directive in installer.nsh and used when the live manifest fetch from updates.shortcutstudio.app fails (offline install, AWS outage, DNS issue). The build-time fallback ships whatever was current when the stub was built; users can always re-run the installer later to pick up a newer manifest.",
+  "schemaVersion": 1,
+  "channel": "stable",
+  "publishedAt": "2026-05-01T00:00:00Z",
+  "stub": {
+    "minVersion": "0.5.0",
+    "url": "",
+    "sha256": "PLACEHOLDER_FILLED_BY_PUBLISH_RELEASE_SCRIPT",
+    "sizeBytes": 0,
+    "_note": "Stub fields are intentionally empty in the baked-in fallback. The in-app updater only references stub.url when the live manifest fetch succeeds and reports a newer version; in that case stub.url comes from the live manifest, not this file."
+  },
+  "app": {
+    "version": "0.5.0",
+    "url": "",
+    "sha256": "PLACEHOLDER_FILLED_BY_PUBLISH_RELEASE_SCRIPT",
+    "blockMapUrl": "",
+    "sizeBytes": 0,
+    "_note": "App fields are intentionally empty in the baked-in fallback. The fallback's job is only to enumerate components that the stub should fetch — the .7z payload is delivered by electron-builder's own nsis-web mechanism (it's bundled next to the stub, not fetched via this manifest's app.url)."
+  },
+  "requiredComponents": [
+    {
+      "id": "ipfs",
+      "displayName": "IPFS Kubo",
+      "kind": "zip-extract",
+      "version": "v0.41.0",
+      "url": "https://dist.ipfs.tech/kubo/v0.41.0/kubo_v0.41.0_windows-amd64.zip",
+      "sha256": "PLACEHOLDER_FILLED_BY_PUBLISH_RELEASE_SCRIPT",
+      "sizeBytes": 40978647,
+      "description": "Peer-to-peer transport for shared file processing.",
+      "extractTo": "extras/ipfs",
+      "sentinelFile": "ipfs.exe"
+    },
+    {
+      "id": "nginx",
+      "displayName": "Nginx",
+      "kind": "zip-extract",
+      "version": "1.26.2",
+      "url": "https://nginx.org/download/nginx-1.26.2.zip",
+      "sha256": "PLACEHOLDER_FILLED_BY_PUBLISH_RELEASE_SCRIPT",
+      "sizeBytes": 2081815,
+      "description": "Reverse proxy for the ExecEngine HTTP / FastAPI consumer-peer layer.",
+      "extractTo": "extras/nginx",
+      "sentinelFile": "nginx.exe"
+    }
+  ],
+  "optionalComponents": [
+    {
+      "id": "ollama",
+      "displayName": "Ollama",
+      "kind": "silent-installer",
+      "version": "0.5.4",
+      "url": "https://github.com/ollama/ollama/releases/download/v0.5.4/OllamaSetup.exe",
+      "sha256": "PLACEHOLDER_FILLED_BY_PUBLISH_RELEASE_SCRIPT",
+      "sizeBytes": 730000000,
+      "description": "Local LLM runtime. Recommended for offline scan.",
+      "silentFlags": ["/SILENT"],
+      "detectPort": 11434,
+      "defaultSelected": false
+    },
+    {
+      "id": "lmstudio",
+      "displayName": "LM Studio",
+      "kind": "silent-installer",
+      "version": "0.3.5",
+      "url": "https://installers.lmstudio.ai/win32/x64/0.3.5/LM-Studio-0.3.5-Setup.exe",
+      "sha256": "PLACEHOLDER_FILLED_BY_PUBLISH_RELEASE_SCRIPT",
+      "sizeBytes": 510000000,
+      "description": "Local LLM server with a model marketplace UI.",
+      "silentFlags": ["/S"],
+      "detectPort": 1234,
+      "defaultSelected": false
+    }
+  ]
+}
