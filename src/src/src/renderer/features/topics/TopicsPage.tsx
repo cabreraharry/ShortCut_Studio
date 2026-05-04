@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import {
   Play,
   Inbox,
@@ -11,13 +11,33 @@ import {
   Sparkles,
   Tags,
   Layers,
-  ArrowRight
+  ArrowRight,
+  ArrowDownAZ,
+  ArrowDown01,
+  MoreHorizontal,
+  AlertTriangle
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { IconButton } from '@/components/ui/icon-button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { toast } from '@/hooks/use-toast'
@@ -33,6 +53,15 @@ import { WithHint } from '@/components/ui/help-hint'
 function errMsg(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback
 }
+
+// How many chips a super-category renders by default before the
+// "Show N more" toggle takes over. Twelve is around the upper limit of
+// what the eye can scan before grouping fatigue (Miller's law's higher
+// bound is 9; flex-wrap softens it a little).
+const COLLAPSE_THRESHOLD = 12
+
+type SortOrder = 'count-desc' | 'name-asc'
+type FilterMode = 'all' | 'unassigned'
 
 export default function TopicsPage() {
   const topicsQuery = useQuery({
@@ -152,7 +181,7 @@ function PipelineBar({
             <span className="inline-flex"><AutoOrganizeButton /></span>
           </WithHint>
           <WithHint label="Asks the AI to suggest topics from files that don't have one yet. Suggestions land in the Pending review queue so you can Approve / Reject / Rename / Merge each one before they're applied. Takes ~30 s.">
-            <span className="inline-flex"><TriggerGenerationButton /></span>
+            <span className="inline-flex"><TriggerGenerationButton variant="outline" /></span>
           </WithHint>
         </div>
       </CardContent>
@@ -200,17 +229,17 @@ function EmptyHero() {
         <div className="max-w-md space-y-2">
           <h2 className="text-xl font-semibold tracking-tight">Ready to organize your library?</h2>
           <p className="text-sm text-muted-foreground">
-            Let the AI scan, cluster, and label your papers. You can review every suggestion before it's
-            applied.
+            Let the AI scan, cluster, and label your papers.
           </p>
         </div>
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <AutoOrganizeButton size="lg" />
-          <TriggerGenerationButton size="lg" variant="outline" />
-        </div>
+        {/* Single primary CTA — Auto-organize is the recommended one-shot
+            path. The previous design rendered Auto-organize and Generate
+            side-by-side with a paragraph below explaining the difference,
+            which made the user read prose to choose their first action. */}
+        <AutoOrganizeButton size="lg" />
         <p className="max-w-md text-[11px] text-muted-foreground">
-          <span className="font-semibold">Auto-organize</span> generates topics and assigns them to super-categories
-          in one pass. <span className="font-semibold">Generate topics</span> gives you fresh suggestions to review manually.
+          Prefer to vet each suggestion?{' '}
+          <TriggerGenerationButton variant="link" size="sm" />
         </p>
       </CardContent>
     </Card>
@@ -218,11 +247,9 @@ function EmptyHero() {
 }
 
 function AutoOrganizeButton({
-  size = 'default',
-  variant = 'default'
+  size = 'default'
 }: {
   size?: 'default' | 'sm' | 'lg'
-  variant?: 'default' | 'outline'
 }) {
   const qc = useQueryClient()
   const mutation = useMutation({
@@ -241,10 +268,8 @@ function AutoOrganizeButton({
   return (
     <Button
       size={size}
-      variant={variant}
       onClick={() => mutation.mutate()}
       disabled={mutation.isPending}
-      className={variant === 'default' ? 'bg-gradient-to-r from-glass-local to-glass-peer text-white hover:brightness-110' : ''}
     >
       <Sparkles className="mr-2 h-4 w-4" />
       Auto-organize with AI
@@ -271,7 +296,7 @@ function TriggerGenerationButton({
   variant = 'default'
 }: {
   size?: 'default' | 'sm' | 'lg'
-  variant?: 'default' | 'outline'
+  variant?: 'default' | 'outline' | 'link'
 } = {}) {
   const qc = useQueryClient()
   const generate = useMutation({
@@ -288,8 +313,14 @@ function TriggerGenerationButton({
     onError: (err) => toast({ title: errMsg(err, 'Generation failed'), variant: 'destructive' })
   })
   return (
-    <Button size={size} variant={variant} onClick={() => generate.mutate()} disabled={generate.isPending}>
-      <Play className="mr-2 h-4 w-4" />
+    <Button
+      size={size}
+      variant={variant}
+      onClick={() => generate.mutate()}
+      disabled={generate.isPending}
+      className={variant === 'link' ? 'h-auto p-0 underline' : ''}
+    >
+      {variant !== 'link' && <Play className="mr-2 h-4 w-4" />}
       Generate topics
     </Button>
   )
@@ -306,6 +337,8 @@ function TopicBrowser() {
   })
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState<FilterMode>('all')
+  const [sort, setSort] = useState<SortOrder>('count-desc')
 
   const assign = useMutation({
     mutationFn: ({ topicName, superCategoryId }: { topicName: string; superCategoryId: number }) =>
@@ -375,10 +408,17 @@ function TopicBrowser() {
     )
   }
 
-  const filteredTopics = useMemo(() => {
+  const sortedTopics = sortTopics(topics, sort)
+  const searchedTopics = (() => {
     const q = search.trim().toLowerCase()
-    return q ? topics.filter((t) => t.topicName.toLowerCase().includes(q)) : topics
-  }, [topics, search])
+    if (!q) return sortedTopics
+    return sortedTopics.filter((t) => t.topicName.toLowerCase().includes(q))
+  })()
+  const filteredTopics =
+    filter === 'unassigned'
+      ? searchedTopics.filter((t) => !t.superCategoryId)
+      : searchedTopics
+
   const unassigned = filteredTopics.filter((t) => !t.superCategoryId)
   const byCategoryList = new Map<number, Topic[]>()
   for (const t of filteredTopics) {
@@ -394,18 +434,43 @@ function TopicBrowser() {
       <CardHeader>
         <CardTitle>Topics</CardTitle>
         <CardDescription>
-          Drag a topic chip onto a super-category below, or use the menu to assign.
+          Drag a topic chip onto a super-category, or click a chip and use the menu to assign.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="relative max-w-sm">
-          <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Filter topics"
-            className="pl-7"
-          />
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative max-w-sm flex-1">
+            <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Filter topics"
+              className="pl-7"
+            />
+          </div>
+          {/* Filter Toggles — narrow the haystack before search runs. The
+              "Unassigned only" view is the most-asked-for state for users
+              cleaning up after Auto-organize. */}
+          <div className="inline-flex items-center gap-1 rounded-md border border-border bg-muted/20 p-0.5 text-xs">
+            <FilterToggle active={filter === 'all'} onClick={() => setFilter('all')}>
+              All
+            </FilterToggle>
+            <FilterToggle
+              active={filter === 'unassigned'}
+              onClick={() => setFilter('unassigned')}
+            >
+              Unassigned only
+            </FilterToggle>
+          </div>
+          <div className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+            Sort:
+            <SortToggle active={sort === 'count-desc'} onClick={() => setSort('count-desc')}>
+              <ArrowDown01 className="h-3 w-3" /> Files
+            </SortToggle>
+            <SortToggle active={sort === 'name-asc'} onClick={() => setSort('name-asc')}>
+              <ArrowDownAZ className="h-3 w-3" /> Name
+            </SortToggle>
+          </div>
         </div>
         <TopicGroup
           title="Unassigned"
@@ -434,6 +499,62 @@ function TopicBrowser() {
   )
 }
 
+function sortTopics(topics: Topic[], order: SortOrder): Topic[] {
+  const copy = topics.slice()
+  if (order === 'count-desc') {
+    copy.sort((a, b) => b.fileCount - a.fileCount || a.topicName.localeCompare(b.topicName))
+  } else {
+    copy.sort((a, b) => a.topicName.localeCompare(b.topicName))
+  }
+  return copy
+}
+
+function FilterToggle({
+  active,
+  onClick,
+  children
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'rounded px-2 py-1 transition-colors',
+        active ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
+function SortToggle({
+  active,
+  onClick,
+  children
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}): JSX.Element {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'inline-flex items-center gap-1 rounded px-1.5 py-0.5',
+        active ? 'bg-accent text-foreground' : 'hover:bg-accent/40'
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
 function TopicGroup({
   title,
   titleBadge,
@@ -452,23 +573,52 @@ function TopicGroup({
   highlightCategoryId?: number
 }) {
   const palette = paletteFor(highlightCategoryId)
+  // Drop-target highlight: the previous design called preventDefault but
+  // never set state, so the drop zone gave no visual confirmation that
+  // the chip would land here. Now we ring the surface in primary while
+  // a chip is hovering.
+  const [dragOver, setDragOver] = useState(false)
+  // Show-more toggle: long super-categories collapse past the first
+  // COLLAPSE_THRESHOLD chips so the wall-of-chips problem from a
+  // 100-topic library doesn't blow out vertical scroll.
+  const [expanded, setExpanded] = useState(false)
+  const visibleTopics =
+    !expanded && topics.length > COLLAPSE_THRESHOLD ? topics.slice(0, COLLAPSE_THRESHOLD) : topics
+  const hiddenCount = topics.length - visibleTopics.length
+
   return (
     <div
-      className="rounded-md border bg-card/40 p-3 transition-colors"
+      className={cn(
+        'rounded-md border bg-card/40 p-3 transition-all',
+        dragOver && 'ring-2 ring-primary/70'
+      )}
       style={
         palette
           ? {
               borderColor: `${palette.border}50`,
-              backgroundColor: `${palette.bg}`
+              backgroundColor: palette.bg
             }
           : undefined
       }
       onDragOver={(e) => {
-        if (highlightCategoryId) e.preventDefault()
+        if (!highlightCategoryId) return
+        e.preventDefault()
+        // Set the visual feedback on every dragOver (the event repeats
+        // continuously while the cursor is over the target). Setting state
+        // every tick is fine — React skips redundant updates.
+        if (!dragOver) setDragOver(true)
+      }}
+      onDragLeave={(e) => {
+        // dragLeave fires even when entering a child; check the relatedTarget
+        // is outside the actual drop zone before clearing the highlight.
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setDragOver(false)
+        }
       }}
       onDrop={(e) => {
         if (!highlightCategoryId) return
         e.preventDefault()
+        setDragOver(false)
         const topicName = e.dataTransfer.getData('text/topic')
         if (topicName) onAssign(topicName, highlightCategoryId)
       }}
@@ -489,17 +639,40 @@ function TopicGroup({
           {highlightCategoryId ? 'Drag topics here to assign.' : 'All topics assigned.'}
         </p>
       ) : (
-        <div className="flex flex-wrap gap-2">
-          {topics.map((t) => (
-            <TopicChip
-              key={t.topicId}
-              topic={t}
-              superCategories={superCategories}
-              onAssign={onAssign}
-              onUnassign={onUnassign}
-            />
-          ))}
-        </div>
+        <>
+          <div className="flex flex-wrap gap-2">
+            {visibleTopics.map((t) => (
+              <TopicChip
+                key={t.topicId}
+                topic={t}
+                superCategories={superCategories}
+                onAssign={onAssign}
+                onUnassign={onUnassign}
+              />
+            ))}
+          </div>
+          {hiddenCount > 0 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="mt-2 h-7 text-[11px] text-muted-foreground"
+              onClick={() => setExpanded(true)}
+            >
+              <MoreHorizontal className="mr-1 h-3 w-3" />
+              Show {hiddenCount} more
+            </Button>
+          )}
+          {expanded && topics.length > COLLAPSE_THRESHOLD && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="mt-2 h-7 text-[11px] text-muted-foreground"
+              onClick={() => setExpanded(false)}
+            >
+              Collapse
+            </Button>
+          )}
+        </>
       )}
     </div>
   )
@@ -531,83 +704,67 @@ function TopicChip({
   onAssign: (topicName: string, superCategoryId: number) => void
   onUnassign: ((topicName: string) => void) | null
 }) {
-  const [menuOpen, setMenuOpen] = useState(false)
   const palette = paletteFor(topic.superCategoryId)
   return (
-    <div className="relative">
-      <button
-        type="button"
-        draggable
-        onDragStart={(e) => {
-          e.dataTransfer.setData('text/topic', topic.topicName)
-          e.dataTransfer.effectAllowed = 'move'
-        }}
-        onClick={() => setMenuOpen((v) => !v)}
-        style={
-          palette
-            ? {
-                borderColor: palette.border,
-                backgroundColor: palette.bg
-              }
-            : undefined
-        }
-        className={cn(
-          'inline-flex items-center gap-2 rounded-md border px-3 py-1 text-xs font-medium transition-colors',
-          palette
-            ? 'hover:brightness-110'
-            : 'border-border bg-card hover:border-primary/40 hover:bg-accent/60'
-        )}
-      >
-        {palette && (
-          <span
-            className="h-1.5 w-1.5 rounded-full"
-            style={{ backgroundColor: palette.dot }}
-          />
-        )}
-        <span>{topic.topicName}</span>
-        <span className="text-muted-foreground">· {topic.fileCount}</span>
-      </button>
-      {menuOpen && (
-        <div className="absolute left-0 top-full z-10 mt-1 w-56 rounded-md border border-border bg-popover p-1 shadow-lg">
-          <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Assign to…
-          </div>
-          {superCategories.length === 0 && (
-            <div className="px-2 py-2 text-xs text-muted-foreground">
-              Create a super-category first.
-            </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          draggable
+          onDragStart={(e) => {
+            e.dataTransfer.setData('text/topic', topic.topicName)
+            e.dataTransfer.effectAllowed = 'move'
+          }}
+          style={
+            palette
+              ? {
+                  borderColor: palette.border,
+                  backgroundColor: palette.bg
+                }
+              : undefined
+          }
+          className={cn(
+            'inline-flex cursor-grab items-center gap-2 rounded-md border px-3 py-1 text-xs font-medium transition-colors active:cursor-grabbing',
+            palette
+              ? 'hover:brightness-110'
+              : 'border-border bg-card hover:border-primary/40 hover:bg-accent/60'
           )}
-          {superCategories.map((sc) => (
-            <button
-              key={sc.superCategoryId}
-              type="button"
-              className="flex w-full items-center rounded px-2 py-1 text-left text-xs hover:bg-accent"
-              onClick={() => {
-                onAssign(topic.topicName, sc.superCategoryId)
-                setMenuOpen(false)
-              }}
-            >
-              {sc.name}
-            </button>
-          ))}
-          {onUnassign && (
-            <>
-              <div className="my-1 h-px bg-border" />
-              <button
-                type="button"
-                className="flex w-full items-center rounded px-2 py-1 text-left text-xs hover:bg-accent"
-                onClick={() => {
-                  onUnassign(topic.topicName)
-                  setMenuOpen(false)
-                }}
-              >
-                Unassign
-              </button>
-            </>
+        >
+          {palette && (
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ backgroundColor: palette.dot }}
+            />
           )}
-        </div>
-      )}
-    </div>
+          <span>{topic.topicName}</span>
+          <span className="text-muted-foreground">· {topic.fileCount}</span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-56">
+        <DropdownMenuLabel>Assign to…</DropdownMenuLabel>
+        {superCategories.length === 0 && (
+          <DropdownMenuItem disabled>
+            Create a super-category first.
+          </DropdownMenuItem>
+        )}
+        {superCategories.map((sc) => (
+          <DropdownMenuItem
+            key={sc.superCategoryId}
+            onSelect={() => onAssign(topic.topicName, sc.superCategoryId)}
+          >
+            {sc.name}
+          </DropdownMenuItem>
+        ))}
+        {onUnassign && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => onUnassign(topic.topicName)}>
+              Unassign
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
@@ -639,7 +796,14 @@ function ReviewQueue({ layout = 'stack' }: { layout?: 'stack' | 'grid' } = {}) {
     mutationFn: (topicName: string) => api.topics.reject(topicName),
     onSuccess: (_d, name) => {
       invalidate()
-      toast({ title: `Rejected "${name}"` })
+      // Reject is one-click but reversible: rerunning Generate topics
+      // typically resurfaces the same suggestion. Make that visible in
+      // the toast so the action doesn't feel dangerously final.
+      toast({
+        title: `Rejected "${name}"`,
+        description: 'Re-run "Generate topics" to bring rejected suggestions back.',
+        variant: 'destructive'
+      })
     },
     onError: (err) => toast({ title: errMsg(err, 'Reject failed'), variant: 'destructive' })
   })
@@ -695,9 +859,13 @@ function ReviewQueue({ layout = 'stack' }: { layout?: 'stack' | 'grid' } = {}) {
                 : 'space-y-2'
             )}
           >
-            {items.map((it, i) => (
+            {items.map((it) => (
+              // Use the suggested name (unique within the queue) as the
+              // React key. An array index would let local state inside
+              // ReviewRow (e.g. 'rename' mode) bleed across items when
+              // the queue shrinks from approval/reject mutations.
               <ReviewRow
-                key={i}
+                key={it.suggestedTopic}
                 item={it}
                 mergeTargets={mergeTargets}
                 onApprove={() => approve.mutate(it)}
@@ -728,7 +896,7 @@ function ReviewRow({
   onRename: (to: string) => void
   onMerge: (into: string) => void
 }) {
-  const [mode, setMode] = useState<'idle' | 'rename' | 'merge'>('idle')
+  const [mode, setMode] = useState<'idle' | 'rename'>('idle')
   const [draft, setDraft] = useState(item.suggestedTopic)
   const confPct = Math.round((item.confidence ?? 0) * 100)
   const { burst: approveBurst, trigger: fireApproveBurst } = useBurst({
@@ -738,9 +906,24 @@ function ReviewRow({
     colorClass: 'bg-emerald-400',
     ringColorClass: 'border-emerald-400/60'
   })
+  // Merge feels almost as rewarding as Approve — the user is consciously
+  // cleaning up duplication. Give it its own (purple) burst so the
+  // payoff for cognitively-expensive cleanup actions doesn't trail the
+  // payoff for low-effort approves.
+  const { burst: mergeBurst, trigger: fireMergeBurst } = useBurst({
+    particleCount: 7,
+    distance: 28,
+    durationMs: 450,
+    colorClass: 'bg-violet-400',
+    ringColorClass: 'border-violet-400/60'
+  })
   const handleApprove = (): void => {
     fireApproveBurst()
     onApprove()
+  }
+  const handleMerge = (into: string): void => {
+    fireMergeBurst()
+    onMerge(into)
   }
 
   return (
@@ -793,9 +976,24 @@ function ReviewRow({
             <Pencil className="mr-1 h-3 w-3" /> Rename
           </Button>
           {mergeTargets.length > 0 && (
-            <Button size="sm" variant="outline" onClick={() => setMode('merge')}>
-              Merge into…
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <div className="relative">
+                  <Button size="sm" variant="outline">
+                    Merge into…
+                  </Button>
+                  {mergeBurst}
+                </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="max-h-64 w-64 overflow-y-auto">
+                <DropdownMenuLabel>Merge into…</DropdownMenuLabel>
+                {mergeTargets.map((t) => (
+                  <DropdownMenuItem key={t} onSelect={() => handleMerge(t)}>
+                    {t}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       )}
@@ -830,32 +1028,6 @@ function ReviewRow({
           <IconButton tip="Cancel renaming" onClick={() => setMode('idle')}>
             <X className="h-4 w-4" />
           </IconButton>
-        </div>
-      )}
-
-      {mode === 'merge' && (
-        <div className="mt-2 space-y-1 rounded-md border border-border bg-popover p-2">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Merge into…
-          </div>
-          <div className="max-h-40 overflow-y-auto">
-            {mergeTargets.map((t) => (
-              <button
-                key={t}
-                type="button"
-                className="flex w-full items-center rounded px-2 py-1 text-left text-xs hover:bg-accent"
-                onClick={() => {
-                  onMerge(t)
-                  setMode('idle')
-                }}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-          <Button size="sm" variant="ghost" onClick={() => setMode('idle')} className="w-full">
-            Cancel
-          </Button>
         </div>
       )}
     </div>
@@ -895,6 +1067,12 @@ function SuperCategoryManager() {
     onError: (err) => toast({ title: errMsg(err, 'Failed to remove'), variant: 'destructive' })
   })
   const [newName, setNewName] = useState('')
+  // Confirm deletion: super-category remove cascades through every topic
+  // that was assigned to it, unassigning each one. That's a destructive
+  // operation that the previous one-click trash icon offered no warning
+  // for. The dialog tells the user how many topics are affected before
+  // they pull the trigger.
+  const [confirmRemove, setConfirmRemove] = useState<SuperCategory | null>(null)
 
   return (
     <Card>
@@ -941,12 +1119,49 @@ function SuperCategoryManager() {
                 key={sc.superCategoryId}
                 cat={sc}
                 onRename={(name) => rename.mutate({ id: sc.superCategoryId, name })}
-                onRemove={() => remove.mutate(sc.superCategoryId)}
+                onRequestRemove={() => setConfirmRemove(sc)}
               />
             ))}
           </div>
         )}
       </CardContent>
+      <Dialog open={!!confirmRemove} onOpenChange={(o) => !o && setConfirmRemove(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Delete super-category?
+            </DialogTitle>
+            <DialogDescription>
+              {confirmRemove && (
+                <>
+                  <span className="font-semibold">"{confirmRemove.name}"</span> will be deleted and
+                  its <span className="font-semibold">{confirmRemove.topicNames.length}</span>{' '}
+                  topic{confirmRemove.topicNames.length === 1 ? '' : 's'} will become Unassigned.
+                  Topic data and approved-state are preserved — only the grouping goes away.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmRemove(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (confirmRemove) {
+                  remove.mutate(confirmRemove.superCategoryId)
+                  setConfirmRemove(null)
+                }
+              }}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete super-category
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }
@@ -954,11 +1169,11 @@ function SuperCategoryManager() {
 function SuperCategoryRow({
   cat,
   onRename,
-  onRemove
+  onRequestRemove
 }: {
   cat: SuperCategory
   onRename: (name: string) => void
-  onRemove: () => void
+  onRequestRemove: () => void
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(cat.name)
@@ -995,7 +1210,7 @@ function SuperCategoryRow({
           <IconButton tip="Rename this super-category" onClick={() => { setDraft(cat.name); setEditing(true) }}>
             <Pencil className="h-4 w-4" />
           </IconButton>
-          <IconButton tip="Delete this super-category" onClick={onRemove}>
+          <IconButton tip="Delete this super-category" onClick={onRequestRemove}>
             <Trash2 className="h-4 w-4" />
           </IconButton>
         </>

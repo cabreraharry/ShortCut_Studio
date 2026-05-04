@@ -25,7 +25,9 @@ const api: ElectronAPI = {
     remove: (id) => ipcRenderer.invoke(IpcChannel.FoldersRemove, id),
     updatePath: (id, newPath) =>
       ipcRenderer.invoke(IpcChannel.FoldersUpdatePath, id, newPath),
-    pickDirectory: () => ipcRenderer.invoke(IpcChannel.FoldersPickDirectory)
+    pickDirectory: () => ipcRenderer.invoke(IpcChannel.FoldersPickDirectory),
+    setInclude: (id, include) =>
+      ipcRenderer.invoke(IpcChannel.FoldersSetInclude, id, include)
   },
   fileTypes: {
     list: () => ipcRenderer.invoke(IpcChannel.FileTypesList),
@@ -117,7 +119,8 @@ const api: ElectronAPI = {
     openFile: (path) => ipcRenderer.invoke(IpcChannel.SystemOpenFile, path),
     revealFolder: (path) => ipcRenderer.invoke(IpcChannel.SystemRevealFolder, path),
     listDrives: () => ipcRenderer.invoke(IpcChannel.SystemListDrives),
-    listChildren: (path) => ipcRenderer.invoke(IpcChannel.SystemListChildren, path)
+    listChildren: (path) => ipcRenderer.invoke(IpcChannel.SystemListChildren, path),
+    shellFolders: () => ipcRenderer.invoke(IpcChannel.SystemShellFolders)
   },
   insights: {
     dedupSummary: () => ipcRenderer.invoke(IpcChannel.ProgressDedupSummary),

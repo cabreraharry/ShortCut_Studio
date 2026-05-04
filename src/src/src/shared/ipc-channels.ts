@@ -20,6 +20,7 @@ export const IpcChannel = {
   FoldersRemove: 'folders:remove',
   FoldersUpdatePath: 'folders:update-path',
   FoldersPickDirectory: 'folders:pick-directory',
+  FoldersSetInclude: 'folders:set-include',
   FileTypesList: 'file-types:list',
   FileTypesToggle: 'file-types:toggle',
   FileTypesAdd: 'file-types:add',
@@ -84,6 +85,10 @@ export const IpcChannel = {
   SystemRevealFolder: 'system:reveal-folder',
   SystemListDrives: 'system:list-drives',
   SystemListChildren: 'system:list-children',
+  // Common shell folders (Documents, Desktop, Downloads, Home) so the
+  // Folders → Browse Drives picker can offer one-click shortcuts. The
+  // OS-specific paths are resolved by Electron's app.getPath().
+  SystemShellFolders: 'system:shell-folders',
 
   // Insights (dedup + folder health + document extraction)
   ProgressDedupSummary: 'progress:dedup-summary',

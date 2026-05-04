@@ -21,13 +21,15 @@ export function OpenAiUsageInline({ providerId }: { providerId: number }): JSX.E
 
   if (!data || !data.ok || data.usdToday === undefined) return null
 
+  // Inlined alongside the "Open usage dashboard" link on the parent
+  // UsageRow — the parent provides the surrounding flex+gap so we don't
+  // double up on margins here. Previous mt-2 inside an mt-2 parent
+  // detached this from its label.
   return (
-    <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
       <DollarSign className="h-3 w-3" />
-      <span>
-        Today: <span className="font-mono text-foreground">${data.usdToday.toFixed(2)}</span>
-      </span>
+      Today: <span className="font-mono text-foreground">${data.usdToday.toFixed(2)}</span>
       <span className="opacity-60">(via OpenAI usage API)</span>
-    </div>
+    </span>
   )
 }

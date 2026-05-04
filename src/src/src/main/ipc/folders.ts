@@ -93,6 +93,16 @@ export function registerFolderHandlers(): void {
     getLocAdmDb().prepare('UPDATE Folder SET Path = ? WHERE ID = ?').run(newPath, id)
   })
 
+  // Toggle the existing row's Include flag. Used by the Switch on each
+  // folder row in the UI; behaves as a true toggle so flipping a row no
+  // longer creates a sibling Exclude entry.
+  ipcMain.handle(IpcChannel.FoldersSetInclude, (_evt, id: number, include: 'Y' | 'N') => {
+    if (include !== 'Y' && include !== 'N') {
+      throw new Error(`VALIDATION: include must be 'Y' or 'N'`)
+    }
+    getLocAdmDb().prepare('UPDATE Folder SET Include = ? WHERE ID = ?').run(include, id)
+  })
+
   ipcMain.handle(IpcChannel.FoldersPickDirectory, async (): Promise<string[]> => {
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory', 'multiSelections']

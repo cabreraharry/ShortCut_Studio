@@ -28,6 +28,7 @@ import type {
   FilterRuleSet,
   FolderRow,
   FsEntry,
+  ShellFolder,
   InsightsGroup,
   InsightsListParams,
   InsightsListResult,
@@ -83,6 +84,10 @@ export interface ElectronAPI {
     remove: (id: number) => Promise<void>
     updatePath: (id: number, newPath: string) => Promise<void>
     pickDirectory: () => Promise<string[]>
+    // True toggle of an existing row's Include flag — the Switch on each
+    // folder row uses this so flipping a row no longer creates a sibling
+    // Exclude entry the way `add(path, 'N')` would.
+    setInclude: (id: number, include: 'Y' | 'N') => Promise<void>
   }
   fileTypes: {
     list: () => Promise<FileTypeFilter[]>
@@ -151,6 +156,7 @@ export interface ElectronAPI {
     revealFolder: (path: string) => Promise<{ via: 'localhost' | 'shell' }>
     listDrives: () => Promise<DriveInfo[]>
     listChildren: (path: string) => Promise<FsEntry[]>
+    shellFolders: () => Promise<ShellFolder[]>
   }
   insights: {
     dedupSummary: () => Promise<DedupSummary>

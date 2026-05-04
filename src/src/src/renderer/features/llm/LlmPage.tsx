@@ -3,15 +3,18 @@ import {
   Eye,
   EyeOff,
   ExternalLink,
-  Info,
   HelpCircle,
   Check,
   X,
   Loader2,
+  Lock,
   ShieldAlert,
-  RefreshCw
+  RefreshCw,
+  Sparkles,
+  Laptop,
+  Cloud
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -30,6 +33,7 @@ import { OpenAiUsageInline } from './OpenAiUsageInline'
 import { SkeletonRows } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/visual/EmptyState'
 import { QueryErrorState } from '@/components/visual/QueryErrorState'
+import { useBurst } from '@/components/visual/Burst'
 
 const BRAND: Record<
   string,
@@ -90,7 +94,7 @@ export default function LlmPage() {
             />
           </CardTitle>
           <CardDescription>
-            Enable a provider by adding an API key (or running Ollama locally). The provider set as default is used when a feature doesn&apos;t override it.
+            Local providers run on your PC and need no key. Cloud providers need an API key. The provider marked Default is used by features that don't pick one explicitly.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -157,36 +161,135 @@ function ProvidersList({
       />
     )
   }
+
+  // Split providers into Local / Cloud sections so the user doesn't have
+  // to scan six identical cards to choose. Local goes first because it's
+  // the recommended starting point (no key, no per-token cost, no data
+  // leaving the machine). The "Start here" highlight on Ollama lights up
+  // when no CLOUD keys have been added yet — a brand-new user benefits
+  // from the nudge; once they've pasted any cloud key the badge goes
+  // away. (Local providers are always pre-seeded, so a heuristic that
+  // treated "any local present" as "configured" was permanently dead.)
+  const localProviders = providers.filter((p) => isLocalProvider(p.providerName))
+  const cloudProviders = providers.filter((p) => !isLocalProvider(p.providerName))
+  const anyCloudKey = cloudProviders.some((p) => p.hasApiKey === 'Y')
+  const recommendStart = !anyCloudKey
+
   return (
-    <div className="space-y-3">
-      {providers.map((p) => (
-        <ProviderCard key={p.providerId} provider={p} onOpenOnboarding={onOpenOnboarding} />
-      ))}
+    <div className="space-y-6">
+      {localProviders.length > 0 && (
+        <ProviderSection
+          icon={<Laptop className="h-3.5 w-3.5" />}
+          title="Local — runs on your PC"
+          subtitle="No API key. No data leaves the machine. Recommended for sensitive work."
+        >
+          {localProviders.map((p) => (
+            <ProviderCard
+              key={p.providerId}
+              provider={p}
+              onOpenOnboarding={onOpenOnboarding}
+              recommended={recommendStart && p.providerName === 'Ollama'}
+            />
+          ))}
+        </ProviderSection>
+      )}
+      {cloudProviders.length > 0 && (
+        <ProviderSection
+          icon={<Cloud className="h-3.5 w-3.5" />}
+          title="Cloud — requires an API key"
+          subtitle="Faster on commodity hardware, but provider may learn from your queries."
+        >
+          {cloudProviders.map((p) => (
+            <ProviderCard
+              key={p.providerId}
+              provider={p}
+              onOpenOnboarding={onOpenOnboarding}
+              recommended={false}
+            />
+          ))}
+        </ProviderSection>
+      )}
     </div>
+  )
+}
+
+function ProviderSection({
+  icon,
+  title,
+  subtitle,
+  children
+}: {
+  icon: JSX.Element
+  title: string
+  subtitle: string
+  children: React.ReactNode
+}): JSX.Element {
+  return (
+    <section className="space-y-3">
+      <div className="flex items-baseline gap-2 border-b border-border/60 pb-1">
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          {icon}
+          {title}
+        </span>
+        <span className="text-[11px] text-muted-foreground/80">{subtitle}</span>
+      </div>
+      <div className="space-y-3">{children}</div>
+    </section>
   )
 }
 
 function ProviderCard({
   provider,
-  onOpenOnboarding
+  onOpenOnboarding,
+  recommended
 }: {
   provider: LlmProvider
   onOpenOnboarding: (guide: ProviderGuide) => void
+  recommended: boolean
 }) {
   const qc = useQueryClient()
   const [showKey, setShowKey] = useState(false)
   const [keyDraft, setKeyDraft] = useState(provider.apiKey)
   const [testResult, setTestResult] = useState<LlmTestResult | null>(null)
   const [discoverResult, setDiscoverResult] = useState<LlmDiscoverResult | null>(null)
+  // Transient "Saved" check next to the key input — fires on a successful
+  // updateKey mutation and clears after a short delay. Without this the
+  // user gets no feedback that their paste actually persisted.
+  const [keySaved, setKeySaved] = useState(false)
+  const savedTimer = useRef<number | null>(null)
+  // One-shot burst on Test success so the Peak-End moment lands.
+  const { burst, trigger: fireSuccessBurst } = useBurst({
+    particleCount: 8,
+    distance: 36,
+    durationMs: 500,
+    colorClass: 'bg-emerald-400',
+    ringColorClass: 'border-emerald-400/60'
+  })
 
   const updateKey = useMutation({
     mutationFn: (key: string) => api.llm.updateKey(provider.providerId, key),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['providers'] })
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['providers'] })
+      setKeySaved(true)
+      if (savedTimer.current) window.clearTimeout(savedTimer.current)
+      savedTimer.current = window.setTimeout(() => setKeySaved(false), 1800)
+    }
   })
+
+  // Cleanup: clear the saved-toast timer on unmount so a card unmount
+  // mid-flight doesn't leak a setState into a dead component.
+  useEffect(() => {
+    return () => {
+      if (savedTimer.current) window.clearTimeout(savedTimer.current)
+    }
+  }, [])
 
   const testConnection = useMutation({
     mutationFn: () => api.llm.testConnection(provider.providerId),
-    onSuccess: (result) => setTestResult(result)
+    onSuccess: (result) => {
+      setTestResult(result)
+      if (result.ok) fireSuccessBurst()
+    }
   })
 
   const discoverModels = useMutation({
@@ -203,15 +306,45 @@ function ProviderCard({
   const brand = BRAND[provider.providerName] ?? BRAND.Default
   const active = isLocal || hasKey
 
+  // Wipe the prior Test/Discover verdict whenever the user edits the key
+  // — a stale "Connected — 312 ms" sitting next to a half-edited key is
+  // worse than no verdict at all.
+  const onKeyChange = (next: string): void => {
+    setKeyDraft(next)
+    if (testResult) setTestResult(null)
+    if (discoverResult) setDiscoverResult(null)
+  }
+
+  const persistKeyIfDirty = (): void => {
+    if (keyDraft !== provider.apiKey) updateKey.mutate(keyDraft)
+  }
+
+  // Test gate: don't fire while a key save is in flight; the test would
+  // race the new key onto the wire and could verify against the OLD key
+  // depending on which mutation completes first. We wait for the save.
+  const testDisabled = testConnection.isPending || updateKey.isPending
+  const discoverDisabled = discoverModels.isPending || updateKey.isPending || (!isLocal && !hasKey)
+
   return (
     <div
-      className="relative overflow-hidden rounded-md border border-border bg-card/60 p-4"
+      className={cn(
+        'relative overflow-hidden rounded-md border bg-card/60 p-4',
+        recommended ? 'border-primary/50 ring-2 ring-primary/30' : 'border-border'
+      )}
       style={{
         backgroundImage: active
           ? `linear-gradient(135deg, ${brand.tint} 0%, transparent 40%)`
           : undefined
       }}
     >
+      {recommended && (
+        <Badge
+          variant="accent"
+          className="absolute right-3 top-3 gap-1 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider"
+        >
+          <Sparkles className="h-3 w-3" /> Start here
+        </Badge>
+      )}
       <div
         aria-hidden
         className="absolute left-0 top-0 h-full w-1"
@@ -285,12 +418,10 @@ function ProviderCard({
             <Input
               type={showKey ? 'text' : 'password'}
               value={keyDraft}
-              onChange={(e) => setKeyDraft(e.target.value)}
+              onChange={(e) => onKeyChange(e.target.value)}
               placeholder={guide?.keyPlaceholder ?? 'Paste API key'}
               className="pr-10 font-mono text-xs"
-              onBlur={() => {
-                if (keyDraft !== provider.apiKey) updateKey.mutate(keyDraft)
-              }}
+              onBlur={persistKeyIfDirty}
             />
             <button
               type="button"
@@ -301,22 +432,25 @@ function ProviderCard({
               {showKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => testConnection.mutate()}
-            disabled={testConnection.isPending}
-          >
-            {testConnection.isPending ? (
-              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-            ) : null}
-            Test
-          </Button>
+          <div className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => testConnection.mutate()}
+              disabled={testDisabled}
+            >
+              {testConnection.isPending ? (
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              ) : null}
+              Test
+            </Button>
+            {burst}
+          </div>
           <Button
             variant="outline"
             size="sm"
             onClick={() => discoverModels.mutate()}
-            disabled={discoverModels.isPending || !hasKey}
+            disabled={discoverDisabled}
             title={hasKey ? 'Fetch model list from provider' : 'Add an API key first'}
           >
             {discoverModels.isPending ? (
@@ -328,23 +462,48 @@ function ProviderCard({
           </Button>
         </div>
       )}
+      {!isLocal && (
+        // Reassurance + save-confirmation line, anchored to the input
+        // because that's the moment the user is anxious about pasting.
+        <div className="mt-1 flex items-center justify-between gap-2 text-[11px]">
+          <span className="inline-flex items-center gap-1 text-muted-foreground">
+            <Lock className="h-3 w-3" />
+            Stored locally in SQLite — sent only to {provider.providerName} when needed.
+          </span>
+          {keySaved && (
+            <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+              <Check className="h-3 w-3" />
+              Saved
+            </span>
+          )}
+          {updateKey.isPending && (
+            <span className="inline-flex items-center gap-1 text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Saving…
+            </span>
+          )}
+        </div>
+      )}
       {isLocal && (
         <div className="mt-3 flex items-center gap-2">
           <p className="flex-1 text-xs text-muted-foreground">
             No key required. Make sure the {provider.providerName} service is running on{' '}
             <span className="font-mono">{provider.apiHost}</span>.
           </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => testConnection.mutate()}
-            disabled={testConnection.isPending}
-          >
-            {testConnection.isPending ? (
-              <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-            ) : null}
-            Test
-          </Button>
+          <div className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => testConnection.mutate()}
+              disabled={testConnection.isPending}
+            >
+              {testConnection.isPending ? (
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              ) : null}
+              Test
+            </Button>
+            {burst}
+          </div>
           <Button
             variant="outline"
             size="sm"
@@ -361,7 +520,7 @@ function ProviderCard({
         </div>
       )}
 
-      {testResult && <TestResultLine result={testResult} />}
+      {testResult && <TestResultLine result={testResult} providerName={provider.providerName} />}
       {discoverResult && <DiscoverResultLine result={discoverResult} />}
       <UsageRow provider={provider} />
     </div>
@@ -377,15 +536,16 @@ function UsageRow({ provider }: { provider: LlmProvider }): JSX.Element | null {
   const url = USAGE_DASHBOARD_URL[provider.providerName]
   if (!url) return null
   return (
-    <div className="mt-2">
-      <button
-        type="button"
+    <div className="mt-3 flex flex-wrap items-center gap-3">
+      <Button
+        variant="link"
+        size="sm"
+        className="h-auto gap-1 px-0 text-xs"
         onClick={() => window.electronAPI.app.openExternal(url)}
-        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline"
       >
         <ExternalLink className="h-3 w-3" />
         Open usage dashboard
-      </button>
+      </Button>
       {provider.providerName === 'OpenAI' && provider.hasApiKey === 'Y' && (
         <OpenAiUsageInline providerId={provider.providerId} />
       )}
@@ -394,6 +554,10 @@ function UsageRow({ provider }: { provider: LlmProvider }): JSX.Element | null {
 }
 
 function DiscoverResultLine({ result }: { result: LlmDiscoverResult }) {
+  // Hover to see the full model list when the truncated tail elides
+  // anything beyond the first three names. Without this the `+12`
+  // suffix had no way to expand and the discovery had no destination.
+  const fullList = result.models && result.models.length > 0 ? result.models.join('\n') : null
   return (
     <div
       className={cn(
@@ -409,10 +573,23 @@ function DiscoverResultLine({ result }: { result: LlmDiscoverResult }) {
           Discovered {result.count} model{result.count === 1 ? '' : 's'}
           {result.fallback ? ' (fallback list)' : ''}
           {result.models && result.models.length > 0 && (
-            <span className="ml-2 font-mono opacity-70">
-              {result.models.slice(0, 3).join(', ')}
-              {result.models.length > 3 ? `, +${result.models.length - 3}` : ''}
-            </span>
+            fullList && result.models.length > 3 ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="ml-2 cursor-help font-mono opacity-70 underline decoration-dotted">
+                    {result.models.slice(0, 3).join(', ')}
+                    , +{result.models.length - 3}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-md">
+                  <pre className="whitespace-pre-wrap font-mono text-[10px]">{fullList}</pre>
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <span className="ml-2 font-mono opacity-70">
+                {result.models.join(', ')}
+              </span>
+            )
           )}
         </span>
       ) : (
@@ -422,25 +599,46 @@ function DiscoverResultLine({ result }: { result: LlmDiscoverResult }) {
   )
 }
 
-function TestResultLine({ result }: { result: LlmTestResult }) {
+function TestResultLine({
+  result,
+  providerName
+}: {
+  result: LlmTestResult
+  providerName: string
+}) {
+  const grade = result.ok && result.latencyMs !== undefined ? gradeLatency(result.latencyMs) : null
   return (
     <div
       className={cn(
-        'mt-2 flex items-center gap-2 rounded-md border px-3 py-1.5 text-xs',
+        'mt-2 flex items-center gap-2 rounded-md border px-3 py-2 text-xs animate-in fade-in slide-in-from-top-1',
         result.ok
           ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300'
           : 'border-destructive/30 bg-destructive/10 text-destructive'
       )}
     >
-      {result.ok ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
+      {result.ok ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
       {result.ok ? (
         <span>
-          Connected — <span className="font-mono">{result.latencyMs} ms</span>
+          Connected to <b>{providerName}</b>
+          {result.latencyMs !== undefined && (
+            <> — <span className="font-mono">{result.latencyMs} ms</span></>
+          )}
+          {grade && <span className="ml-1 italic opacity-70">({grade})</span>}
         </span>
       ) : (
         <span>Failed: {result.error}</span>
       )}
-      <Info className="ml-auto h-3 w-3 opacity-60" />
     </div>
   )
+}
+
+// Latency thresholds tuned for HTTP round-trips against an LLM
+// completion endpoint: < 300 ms is local-network-fast; < 1 s is normal
+// for cloud providers in the same region; anything over 2 s suggests
+// a coast-far-from-the-DC edge case and is worth flagging.
+function gradeLatency(ms: number): string {
+  if (ms < 300) return 'fast'
+  if (ms < 1000) return 'good'
+  if (ms < 2000) return 'ok'
+  return 'slow'
 }

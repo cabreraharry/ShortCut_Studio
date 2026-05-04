@@ -7,12 +7,16 @@ import {
   FolderPlus,
   FolderMinus,
   Loader2,
-  X
+  FileText,
+  Cloud,
+  Monitor,
+  Download
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { BulkActionBar } from '@/components/visual/BulkActionBar'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import type { FolderRow, FsEntry } from '@shared/types'
+import type { FolderRow, FsEntry, ShellFolder } from '@shared/types'
 
 function formatBytes(n: number): string {
   if (!n) return '—'
@@ -90,7 +94,15 @@ export function DriveTree({ onPick, onPickMany, folders = [] }: DriveTreeProps):
     queryKey: ['drives'],
     queryFn: () => api.system.listDrives()
   })
+  const { data: shellFolders = [] } = useQuery({
+    queryKey: ['shellFolders'],
+    queryFn: () => api.system.shellFolders()
+  })
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  // Hoist expanded state up so quick-pick shortcuts can drive it. Without
+  // this each TreeNode owned its own state and the user had to walk the
+  // tree manually after every shortcut click.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   const foldersByPath = useMemo(
     () => new Map(folders.map((f) => [normalizePath(f.path), f])),
@@ -103,6 +115,45 @@ export function DriveTree({ onPick, onPickMany, folders = [] }: DriveTreeProps):
       const next = new Set(prev)
       if (next.has(path)) next.delete(path)
       else next.add(path)
+      return next
+    })
+  }
+
+  // The expanded Set always stores normalised (lowercase, no trailing
+  // slash) keys. TreeNode looks up against the same normalisation. Storing
+  // mixed-case keys would let the same node end up in the Set twice —
+  // once via expandAncestors (lowercase) and once via the chevron click
+  // path (raw, e.g. 'C:\\') — and the chevron click would only remove
+  // one of them, leaving the node permanently expanded.
+  const toggleExpand = (path: string): void => {
+    const key = normalizePath(path)
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  // Walk back up the tree expanding every ancestor so a shortcut for
+  // C:\Users\<me>\Documents reveals the path even if the drive node has
+  // never been opened.
+  const expandAncestors = (path: string): void => {
+    const parts: string[] = []
+    let cursor = normalizePath(path)
+    while (cursor.length > 0) {
+      parts.push(cursor)
+      const idx = cursor.lastIndexOf('\\')
+      if (idx <= 2) {
+        // Drive root like 'c:' — keep the normalised form for the Set so
+        // it agrees with toggleExpand's keying.
+        break
+      }
+      cursor = cursor.slice(0, idx)
+    }
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      for (const p of parts) next.add(p)
       return next
     })
   }
@@ -131,36 +182,44 @@ export function DriveTree({ onPick, onPickMany, folders = [] }: DriveTreeProps):
   return (
     <div>
       {selected.size > 0 && (
-        <div className="sticky top-0 z-10 flex items-center gap-2 border-b border-border bg-primary/10 px-2 py-1.5 text-xs backdrop-blur">
-          <span className="font-semibold">
-            {selected.size} selected
-          </span>
-          <Button
-            size="sm"
-            variant="outline"
-            className="ml-auto h-6 gap-1 px-2 text-[10px]"
-            onClick={() => applyToSelected('include')}
-          >
-            <FolderPlus className="h-3 w-3" /> Include {selected.size}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-6 gap-1 px-2 text-[10px]"
-            onClick={() => applyToSelected('exclude')}
-          >
-            <FolderMinus className="h-3 w-3" /> Exclude {selected.size}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 gap-1 px-2 text-[10px]"
-            onClick={clearSelection}
-          >
-            <X className="h-3 w-3" /> Clear
-          </Button>
-        </div>
+        <BulkActionBar
+          count={selected.size}
+          sticky
+          onClear={clearSelection}
+          actions={[
+            {
+              key: 'include',
+              label: `Include ${selected.size}`,
+              icon: <FolderPlus className="mr-1 h-3 w-3" />,
+              onClick: () => applyToSelected('include')
+            },
+            {
+              key: 'exclude',
+              label: `Exclude ${selected.size}`,
+              icon: <FolderMinus className="mr-1 h-3 w-3" />,
+              onClick: () => applyToSelected('exclude')
+            }
+          ]}
+          className="rounded-none"
+        />
       )}
+
+      {/* Quick-pick shortcuts. Saves users from chevron-walking 4 levels deep
+          to reach Documents / Desktop / Downloads. We hide the strip
+          entirely when the OS doesn't surface any of these (e.g. on a
+          stripped Windows install). */}
+      {shellFolders.length > 0 && (
+        <ShellFolderShortcuts
+          folders={shellFolders}
+          onJump={(p) => {
+            expandAncestors(p)
+            // Highlight the destination so the user can immediately
+            // see where the tree just opened to.
+            setSelected(new Set([p]))
+          }}
+        />
+      )}
+
       <div className="space-y-0.5 p-1">
         {drives.map((d) => {
           const path = `${d.letter}:\\`
@@ -174,6 +233,8 @@ export function DriveTree({ onPick, onPickMany, folders = [] }: DriveTreeProps):
               onPick={onPick}
               selected={selected}
               onToggleSelect={toggleSelect}
+              expanded={expanded}
+              onToggleExpand={toggleExpand}
               foldersByPath={foldersByPath}
               folders={folders}
             />
@@ -184,7 +245,9 @@ export function DriveTree({ onPick, onPickMany, folders = [] }: DriveTreeProps):
         <div className="flex items-center gap-3 border-t border-border/50 bg-muted/20 px-3 py-1.5 text-[10px] text-muted-foreground">
           <Legend color="bg-emerald-500" label="Included" />
           <Legend color="bg-amber-700" label="Excluded" />
-          <span className="ml-auto italic">Ctrl+click to multi-select · plain click replaces selection</span>
+          <span className="ml-auto italic">
+            Click a row to expand · Ctrl+click to multi-select
+          </span>
         </div>
       )}
     </div>
@@ -200,6 +263,47 @@ function Legend({ color, label }: { color: string; label: string }): JSX.Element
   )
 }
 
+function ShellFolderShortcuts({
+  folders,
+  onJump
+}: {
+  folders: ShellFolder[]
+  onJump: (path: string) => void
+}): JSX.Element {
+  const iconFor = (id: ShellFolder['id']): JSX.Element => {
+    switch (id) {
+      case 'documents':
+        return <FileText className="h-3 w-3" />
+      case 'desktop':
+        return <Monitor className="h-3 w-3" />
+      case 'downloads':
+        return <Download className="h-3 w-3" />
+      case 'onedrive':
+        return <Cloud className="h-3 w-3" />
+    }
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 border-b border-border/50 bg-muted/10 px-2 py-1.5">
+      <span className="mr-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        Shortcuts
+      </span>
+      {folders.map((f) => (
+        <Button
+          key={f.id}
+          size="sm"
+          variant="outline"
+          className="h-6 gap-1 px-2 text-[10px]"
+          onClick={() => onJump(f.path)}
+          title={f.path}
+        >
+          {iconFor(f.id)}
+          {f.label}
+        </Button>
+      ))}
+    </div>
+  )
+}
+
 interface TreeNodeProps {
   path: string
   label: string
@@ -209,6 +313,8 @@ interface TreeNodeProps {
   onPick: (path: string, action: 'include' | 'exclude') => void
   selected: Set<string>
   onToggleSelect: (path: string, ctrl: boolean) => void
+  expanded: Set<string>
+  onToggleExpand: (path: string) => void
   foldersByPath: Map<string, FolderRow>
   folders: FolderRow[]
 }
@@ -222,14 +328,19 @@ function TreeNode({
   onPick,
   selected,
   onToggleSelect,
+  expanded,
+  onToggleExpand,
   foldersByPath,
   folders
 }: TreeNodeProps): JSX.Element {
-  const [expanded, setExpanded] = useState(false)
+  // The Set stores normalised keys exclusively (toggleExpand normalises
+  // before insert) so the lookup is single-form too. Avoids the duplicate
+  // key bug that otherwise lets a single node end up in the Set twice.
+  const isExpanded = expanded.has(normalizePath(path))
   const { data: children = [], isLoading } = useQuery({
     queryKey: ['fs', path],
     queryFn: () => api.system.listChildren(path),
-    enabled: expanded
+    enabled: isExpanded
   })
 
   const state = deriveState(path, folders)
@@ -249,7 +360,16 @@ function TreeNode({
           // Ignore clicks that came from the chevron/include/exclude buttons.
           const target = e.target as HTMLElement
           if (target.closest('[data-tree-action]')) return
-          onToggleSelect(path, e.ctrlKey || e.metaKey)
+          // Match Windows Explorer / VS Code: row click expands; modifier
+          // clicks add to a multi-selection. Selection is still possible
+          // via Ctrl+click; the previous "row toggles selection, chevron
+          // toggles expansion" model required two clicks to reach the
+          // most common task on this tree.
+          if (e.ctrlKey || e.metaKey || e.shiftKey) {
+            onToggleSelect(path, true)
+          } else {
+            onToggleExpand(path)
+          }
         }}
       >
         <button
@@ -257,30 +377,37 @@ function TreeNode({
           data-tree-action="expand"
           onClick={(e) => {
             e.stopPropagation()
-            setExpanded((v) => !v)
+            onToggleExpand(path)
           }}
-          className="flex flex-1 items-center gap-1.5 text-left"
+          // Bigger hit area for the chevron — at default DPI the previous
+          // h-3 w-3 was a ~6 px target after padding. The visible glyph
+          // stays small but the tap region is now h-6 wide.
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-accent/60"
+          aria-label={isExpanded ? 'Collapse' : 'Expand'}
         >
           <ChevronRight
-            className={cn('h-3 w-3 text-muted-foreground transition-transform', expanded && 'rotate-90')}
+            className={cn('h-3 w-3 text-muted-foreground transition-transform', isExpanded && 'rotate-90')}
           />
-          <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="truncate font-mono">{label}</span>
-          {entry?.fileCount !== undefined && (
-            <span className="ml-1 text-[10px] text-muted-foreground">· {entry.fileCount}</span>
-          )}
-          {state === 'included' && (
-            <span className="ml-1 text-[9px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-              included
-            </span>
-          )}
-          {state === 'excluded' && (
-            <span className="ml-1 text-[9px] uppercase tracking-wider text-amber-700 dark:text-amber-400">
-              excluded
-            </span>
-          )}
         </button>
-        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100" data-tree-action="include-exclude">
+        <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        <span className="flex-1 truncate font-mono">{label}</span>
+        {entry?.fileCount !== undefined && (
+          <span className="text-[10px] text-muted-foreground">· {entry.fileCount}</span>
+        )}
+        {state === 'included' && (
+          <span className="text-[9px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+            included
+          </span>
+        )}
+        {state === 'excluded' && (
+          <span className="text-[9px] uppercase tracking-wider text-amber-700 dark:text-amber-400">
+            excluded
+          </span>
+        )}
+        {/* Always-visible action buttons. Hover-only affordances kept the
+            page hostile to keyboard / touch users and meant a brand-new
+            user saw zero verbs in the picker. */}
+        <div className="flex shrink-0 gap-0.5" data-tree-action="include-exclude">
           <Button
             size="sm"
             variant="outline"
@@ -307,7 +434,7 @@ function TreeNode({
           </Button>
         </div>
       </div>
-      {expanded && (
+      {isExpanded && (
         <div>
           {isLoading ? (
             <div
@@ -334,6 +461,8 @@ function TreeNode({
                 onPick={onPick}
                 selected={selected}
                 onToggleSelect={onToggleSelect}
+                expanded={expanded}
+                onToggleExpand={onToggleExpand}
                 foldersByPath={foldersByPath}
                 folders={folders}
               />

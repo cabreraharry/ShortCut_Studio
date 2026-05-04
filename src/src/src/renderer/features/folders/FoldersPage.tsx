@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { IconButton } from '@/components/ui/icon-button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
+import { Switch } from '@/components/ui/switch'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { HelpHint } from '@/components/ui/help-hint'
 import { cn } from '@/lib/utils'
@@ -16,6 +16,7 @@ import { useRowSelection } from '@/hooks/use-row-selection'
 import { ErrorDialog } from '@/components/ui/error-dialog'
 import { DriveTree } from '@/components/drive-tree/DriveTree'
 import { EmptyState } from '@/components/visual/EmptyState'
+import { BulkActionBar } from '@/components/visual/BulkActionBar'
 import { QueryErrorState } from '@/components/visual/QueryErrorState'
 import { SkeletonRows } from '@/components/ui/skeleton'
 import {
@@ -50,8 +51,11 @@ export default function FoldersPage() {
           Decide which directories get scanned and which to exclude. Pick the file types that count as scannable content.
         </p>
       </div>
-      <FileTypesCard />
+      {/* FoldersCard first: a brand-new user (zero folders configured) hits
+          this page and the empty-state CTA "Browse drives" needs to be the
+          first thing they see, not the FileTypes chips below. */}
       <FoldersCard />
+      <FileTypesCard />
       <PrivacyTeaser />
     </div>
   )
@@ -280,6 +284,21 @@ function FoldersCard() {
     onError: (err) => toast({ title: errMsg(err, 'Bulk remove failed'), variant: 'destructive' })
   })
 
+  // True toggle of an existing row's Include flag — Switch on each row uses
+  // this so flipping a folder no longer creates a sibling Exclude entry.
+  const setInclude = useMutation({
+    mutationFn: ({ id, include }: { id: number; include: 'Y' | 'N' }) =>
+      api.folders.setInclude(id, include),
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['folders'] })
+      toast({
+        title: vars.include === 'Y' ? 'Folder included' : 'Folder excluded',
+        variant: 'success'
+      })
+    },
+    onError: (err) => toast({ title: errMsg(err, 'Failed to update'), variant: 'destructive' })
+  })
+
   return (
     <Card>
       <ErrorDialog
@@ -340,23 +359,20 @@ function FoldersCard() {
             />
           </div>
         )}
-        {selection.selectedCount > 0 && (
-          <div className="flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-xs">
-            <span className="font-medium">{selection.selectedCount} selected</span>
-            <Button
-              size="sm"
-              variant="outline"
-              className="ml-auto"
-              onClick={() => bulkRemove.mutate(Array.from(selection.selectedIds))}
-              disabled={bulkRemove.isPending}
-            >
-              <Trash2 className="mr-1 h-3 w-3" /> Remove all
-            </Button>
-            <Button size="sm" variant="ghost" onClick={selection.clear}>
-              Clear
-            </Button>
-          </div>
-        )}
+        <BulkActionBar
+          count={selection.selectedCount}
+          onClear={selection.clear}
+          actions={[
+            {
+              key: 'remove',
+              label: 'Remove all',
+              icon: <Trash2 className="mr-1 h-3 w-3" />,
+              onClick: () => bulkRemove.mutate(Array.from(selection.selectedIds)),
+              disabled: bulkRemove.isPending
+            }
+          ]}
+        />
+
         {isLoading ? (
           <SkeletonRows count={4} />
         ) : isError ? (
@@ -382,16 +398,28 @@ function FoldersCard() {
           </div>
         ) : (
           <div className="divide-y divide-border rounded-md border border-border">
-            {filtered.map((f) => (
-              <FolderRowItem
-                key={f.id}
-                row={f}
-                selected={selection.isSelected(f.id)}
-                onToggleSelect={() => selection.toggle(f.id)}
-                onRemove={() => removeFolder.mutate(f.id)}
-                onSavePath={(newPath) => updatePath.mutate({ id: f.id, newPath })}
-              />
-            ))}
+            {filtered.map((f) => {
+              // Disable the Switch while THIS row's setInclude is in flight.
+              // Without the guard a fast double-toggle queues two UPDATEs
+              // and the user can land on the opposite of what they meant
+              // when the second mutation completes after the first.
+              const includePending =
+                setInclude.isPending && setInclude.variables?.id === f.id
+              return (
+                <FolderRowItem
+                  key={f.id}
+                  row={f}
+                  selected={selection.isSelected(f.id)}
+                  onToggleSelect={() => selection.toggle(f.id)}
+                  onRemove={() => removeFolder.mutate(f.id)}
+                  onSavePath={(newPath) => updatePath.mutate({ id: f.id, newPath })}
+                  onToggleInclude={(include) =>
+                    setInclude.mutate({ id: f.id, include: include ? 'Y' : 'N' })
+                  }
+                  includePending={includePending}
+                />
+              )
+            })}
           </div>
         )}
       </CardContent>
@@ -404,17 +432,22 @@ function FolderRowItem({
   selected,
   onToggleSelect,
   onRemove,
-  onSavePath
+  onSavePath,
+  onToggleInclude,
+  includePending
 }: {
   row: FolderRow
   selected: boolean
   onToggleSelect: () => void
   onRemove: () => void
   onSavePath: (newPath: string) => void
+  onToggleInclude: (include: boolean) => void
+  includePending: boolean
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(row.path)
   const isIncluded = row.include === 'Y'
+  const dirty = editing && draft !== row.path
 
   return (
     <div
@@ -431,9 +464,32 @@ function FolderRowItem({
         className="h-3.5 w-3.5 cursor-pointer accent-primary"
         aria-label={`Select ${row.path}`}
       />
-      <Badge variant={isIncluded ? 'success' : 'warning'}>
-        {isIncluded ? 'Include' : 'Exclude'}
-      </Badge>
+      {/* True toggle for the row's Include/Exclude state. The previous
+          static badge confused users into clicking again, which created
+          a sibling Exclude entry instead of flipping the existing row. */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex items-center gap-1.5">
+            <Switch
+              checked={isIncluded}
+              onCheckedChange={onToggleInclude}
+              disabled={includePending}
+              aria-label={isIncluded ? 'Currently included — switch off to exclude' : 'Currently excluded — switch on to include'}
+            />
+            <span className={cn(
+              'text-[10px] font-semibold uppercase tracking-wider',
+              isIncluded ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
+            )}>
+              {isIncluded ? 'Included' : 'Excluded'}
+            </span>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>
+          {isIncluded
+            ? 'Switch off to stop scanning this folder.'
+            : 'Switch on to include this folder. Excluded children of an Include parent still win.'}
+        </TooltipContent>
+      </Tooltip>
       {editing ? (
         <>
           <Input
@@ -451,24 +507,33 @@ function FolderRowItem({
               }
             }}
           />
-          <IconButton
-            tip="Save the new path"
+          {/* Labelled buttons instead of icon-only — without text, two
+              chevrons of the same colour next to a path input are
+              ambiguous, especially since pressing the wrong one silently
+              destroys the in-flight edit. */}
+          <Button
+            size="sm"
+            variant="default"
+            disabled={!dirty}
             onClick={() => {
               onSavePath(draft)
               setEditing(false)
             }}
           >
-            <Check className="h-4 w-4" />
-          </IconButton>
-          <IconButton
-            tip="Cancel without saving"
+            <Check className="mr-1 h-3 w-3" />
+            Save
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
             onClick={() => {
               setDraft(row.path)
               setEditing(false)
             }}
           >
-            <X className="h-4 w-4" />
-          </IconButton>
+            <X className="mr-1 h-3 w-3" />
+            Cancel
+          </Button>
         </>
       ) : (
         <>

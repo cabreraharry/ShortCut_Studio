@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Laptop, Cloud } from 'lucide-react'
 import { api } from '@/lib/api'
+import { isLocalProvider } from '@shared/providers'
 
 interface NodePos {
   name: string
@@ -9,12 +10,23 @@ interface NodePos {
   kind: 'local' | 'cloud'
 }
 
+// All six seeded providers get a slot. Local stack sits left of the
+// dashed divider, cloud stack to the right. Y values fan out so labels
+// never collide. Add a coord here when introducing a new provider —
+// missing entries fall back to the off-canvas slot below.
 const POSITIONS: Record<string, NodePos> = {
-  Ollama: { name: 'Ollama', cx: 70, cy: 110, kind: 'local' },
+  Ollama: { name: 'Ollama', cx: 70, cy: 80, kind: 'local' },
+  'LM Studio': { name: 'LM Studio', cx: 70, cy: 175, kind: 'local' },
   OpenAI: { name: 'OpenAI', cx: 330, cy: 40, kind: 'cloud' },
-  Claude: { name: 'Claude', cx: 360, cy: 125, kind: 'cloud' },
-  Gemini: { name: 'Gemini', cx: 330, cy: 210, kind: 'cloud' }
+  Claude: { name: 'Claude', cx: 360, cy: 110, kind: 'cloud' },
+  Gemini: { name: 'Gemini', cx: 360, cy: 175, kind: 'cloud' },
+  HuggingFace: { name: 'HuggingFace', cx: 330, cy: 230, kind: 'cloud' }
 }
+
+// Position for any provider whose name we haven't mapped above. Better than
+// silently dropping the node — the user adding a new provider should see
+// SOMETHING light up in the hero so the widget reflects their state.
+const FALLBACK_POSITION: NodePos = { name: 'Other', cx: 200, cy: 250, kind: 'cloud' }
 
 export function ProviderHub(): JSX.Element {
   const { data: providers = [] } = useQuery({
@@ -22,7 +34,13 @@ export function ProviderHub(): JSX.Element {
     queryFn: () => api.llm.listProviders()
   })
 
-  const configuredCount = providers.filter((p) => p.hasApiKey === 'Y' || p.providerName === 'Ollama').length
+  // Local providers don't need a key — they're "configured" by virtue
+  // of being installable. Cloud providers need an API key. Source-of-
+  // truth on local-vs-cloud is the shared providers module so adding a
+  // new local provider in one place doesn't drift this widget.
+  const configuredCount = providers.filter(
+    (p) => p.hasApiKey === 'Y' || isLocalProvider(p.providerName)
+  ).length
 
   return (
     <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-glass-local/10 via-transparent to-glass-peer/10 p-5">
@@ -76,9 +94,12 @@ export function ProviderHub(): JSX.Element {
 
         {/* Center "YOU" node */}
         {providers.map((p) => {
-          const pos = POSITIONS[p.providerName]
-          if (!pos) return null
-          const active = p.hasApiKey === 'Y' || p.providerName === 'Ollama'
+          const pos = POSITIONS[p.providerName] ?? FALLBACK_POSITION
+          // "Active" follows the same rule as ProvidersList: cloud providers
+          // need a key, local providers are always active. pos.kind is just
+          // a layout hint and would be wrong for a local provider that
+          // fell back to FALLBACK_POSITION (cloud-side coords).
+          const active = p.hasApiKey === 'Y' || isLocalProvider(p.providerName)
           const color = pos.kind === 'local' ? 'hsl(var(--glass-local))' : 'hsl(var(--glass-peer))'
           return (
             <g key={p.providerName}>
@@ -112,9 +133,12 @@ export function ProviderHub(): JSX.Element {
 
         {/* Provider nodes */}
         {providers.map((p, i) => {
-          const pos = POSITIONS[p.providerName]
-          if (!pos) return null
-          const active = p.hasApiKey === 'Y' || p.providerName === 'Ollama'
+          const pos = POSITIONS[p.providerName] ?? FALLBACK_POSITION
+          // "Active" follows the same rule as ProvidersList: cloud providers
+          // need a key, local providers are always active. pos.kind is just
+          // a layout hint and would be wrong for a local provider that
+          // fell back to FALLBACK_POSITION (cloud-side coords).
+          const active = p.hasApiKey === 'Y' || isLocalProvider(p.providerName)
           const color = pos.kind === 'local' ? 'hsl(var(--glass-local))' : 'hsl(var(--glass-peer))'
           return (
             <g key={p.providerName}>

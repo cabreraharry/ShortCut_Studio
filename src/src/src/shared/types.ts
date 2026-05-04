@@ -234,6 +234,15 @@ export interface FsEntry {
   sizeBytes?: number
 }
 
+// Common Windows shell folders, surfaced as one-click shortcuts in the
+// Folders → Browse Drives picker. id is the canonical Electron app.getPath
+// key so the renderer can pick an icon by id without coupling to label.
+export interface ShellFolder {
+  id: 'documents' | 'desktop' | 'downloads' | 'onedrive'
+  label: string
+  path: string
+}
+
 export interface FileTypeFilter {
   extension: string    // e.g. '.pdf'
   label: string        // e.g. 'PDF'
