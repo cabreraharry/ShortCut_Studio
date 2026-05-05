@@ -6,7 +6,7 @@ import { registerIpcHandlers } from './ipc'
 import { initDatabase, closeDatabase } from './db/connection'
 import { initErrorsDb, closeErrorsDb } from './db/errorsConnection'
 import { runMigrations } from './db/migrations'
-import { startWorkerSupervisor, stopAllWorkers } from './workers/supervisor'
+import { startWorkerSupervisor, stopAllWorkersAsync } from './workers/supervisor'
 import { startLlmBridgeServer, stopLlmBridgeServer } from './llm/bridgeServer'
 import { recordError } from './diagnostics/errorStore'
 import { initAuthState, verifyPersistedToken } from './execengine/authState'
@@ -43,8 +43,23 @@ function nativeModuleMismatchHint(err: unknown): string | null {
  * console, so without this the app would crash to desktop after the splash
  * with no indication of what failed. Dev builds keep the console.error so
  * the developer sees the full stack.
+ *
+ * `fatalDialogShown` is a once-flag — the per-stage `try/catch` in
+ * bootstrap calls this and re-throws (the throw at the bottom is a hard
+ * fence to satisfy the `never` return type). The re-throw escapes the
+ * try/catch, propagates out of bootstrap, and lands in the
+ * bootstrap().catch handler — which would otherwise show a SECOND dialog
+ * for the same failure. The flag suppresses the duplicate.
  */
+let fatalDialogShown = false
 function fatalStartupAndExit(err: unknown, stage: string): never {
+  if (fatalDialogShown) {
+    // eslint-disable-next-line no-console
+    console.error(`[main] ${stage} failed (suppressed dup dialog)`, err)
+    app.exit(1)
+    throw err
+  }
+  fatalDialogShown = true
   const hint = nativeModuleMismatchHint(err)
   // Always log too — useful in dev where the dialog is a paper-cut.
   // eslint-disable-next-line no-console
@@ -58,9 +73,10 @@ function fatalStartupAndExit(err: unknown, stage: string): never {
       `Failed during ${stage}:\n\n${message}\n\nIf this persists, re-run the installer.`
     )
   }
+  // app.exit calls process.exit synchronously on the next event loop tick;
+  // the throw below is a TypeScript fence so callers can't accidentally
+  // continue past this function (the `never` contract).
   app.exit(1)
-  // app.exit is async — `never` return type prevents callers from continuing
-  // past it accidentally. Throw as a hard fence:
   throw err
 }
 
@@ -165,25 +181,52 @@ app.on('window-all-closed', () => {
   if (process.platform === 'darwin') app.quit()
 })
 
-app.on('before-quit', () => {
+// Async shutdown via preventDefault + app.quit on completion. Without
+// this, stopAllWorkers ran synchronously and any "wait for graceful
+// SIGTERM exit" was effectively skipped (Node hadn't run the exit
+// listeners yet by the time the next sync line ran). The preventDefault
+// pattern lets us actually wait for Python workers' shutdown handlers
+// (log flush, DB cursor close) before force-killing survivors.
+let shuttingDown = false
+app.on('before-quit', (event) => {
+  if (shuttingDown) return
+  event.preventDefault()
+  shuttingDown = true
+  void shutdownAndQuit()
+})
+
+async function shutdownAndQuit(): Promise<void> {
   markQuitting()
   destroyTray()
   stopUpdater()
-  stopAllWorkers()
+  // killWithEscalation gives each worker up to 2 s to exit cleanly on
+  // SIGTERM before taskkill /F /T. Run in parallel — three workers
+  // shutting down independently is faster than serially.
+  try {
+    await stopAllWorkersAsync()
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[main] stopAllWorkersAsync failed', err)
+  }
   stopLlmBridgeServer()
   // Independent try/catch per DB so a throw in one (e.g. better-sqlite3 throws
   // TypeError on double-close) doesn't leak the other handle.
   try {
     closeDatabase()
   } catch (err) {
+    // eslint-disable-next-line no-console
     console.error('[main] closeDatabase failed', err)
   }
   try {
     closeErrorsDb()
   } catch (err) {
+    // eslint-disable-next-line no-console
     console.error('[main] closeErrorsDb failed', err)
   }
-})
+  // Now actually quit. Use exit instead of quit — quit re-fires
+  // before-quit, which we've guarded but the recursion is unnecessary.
+  app.exit(0)
+}
 
 // Dev-mode: re-enable default menu accelerators for inspector, etc.
 if (!app.isPackaged) {

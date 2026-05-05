@@ -340,8 +340,14 @@ function forceKillTree(pid: number): void {
 /**
  * Wait for a child to exit, escalating to SIGKILL/taskkill on timeout.
  * Returns when the child has exited or the force-kill timeout has elapsed
- * (whichever comes first). Used by restartWorker so we never spawn a
- * replacement while the previous instance still holds the worker port.
+ * (whichever comes first). Used by restartWorker AND by stopAllWorkersAsync
+ * so we never spawn a replacement while the previous instance still holds
+ * the worker port, and we never declare shutdown done while a Python
+ * worker is still mid-flush.
+ *
+ * Listener registration order: 'exit' is registered BEFORE the synchronous
+ * exitCode re-check inside the Promise executor, closing the narrow race
+ * where the child exits between function entry and listener register.
  */
 async function killWithEscalation(
   handle: WorkerHandle,
@@ -352,11 +358,16 @@ async function killWithEscalation(
   if (!child || child.killed || child.exitCode !== null) return
 
   const exited = new Promise<void>((resolve) => {
+    // Register the listener FIRST. Even if the child has already exited
+    // by the time the executor runs, the synchronous exitCode check below
+    // catches that case and resolves immediately. The listener is a no-op
+    // in that branch (Node's once() ignores subsequent emits after the
+    // child has already exited, but it also just won't fire — either way
+    // we've resolved via the sync path).
+    child.once('exit', () => resolve())
     if (child.exitCode !== null) {
       resolve()
-      return
     }
-    child.once('exit', () => resolve())
   })
 
   try {
@@ -380,7 +391,20 @@ async function killWithEscalation(
   ])
 }
 
-export function stopAllWorkers(): void {
+/**
+ * Asynchronous shutdown that gives every worker a chance to exit gracefully
+ * via SIGTERM before escalating to taskkill /F /T. Run from the
+ * before-quit handler with event.preventDefault() + app.quit() once we
+ * resolve, so Electron actually waits for graceful shutdown.
+ *
+ * The previous fully-synchronous shape (SIGTERM all, then immediately
+ * taskkill the survivors) didn't work as documented — pass 2's
+ * `child.exitCode === null` check fires before Node's event loop has had
+ * any chance to emit the 'exit' event, so survivors === everyone, so
+ * every shutdown was a hard taskkill. That defeated the FastAPI wrapper's
+ * shutdown handlers (log flush, DB cursor close).
+ */
+export async function stopAllWorkersAsync(): Promise<void> {
   // Set the shutdown flag BEFORE killing children. The exit handler's
   // setTimeout-restart path checks this flag and bails out, so a worker that
   // crashes 1-5 ms before stopAllWorkers runs doesn't get auto-respawned
@@ -390,14 +414,35 @@ export function stopAllWorkers(): void {
     clearInterval(healthInterval)
     healthInterval = null
   }
-  // SIGTERM-then-taskkill in two passes. The first pass is graceful: every
-  // worker gets a kill() that triggers Python's signal handlers, so the
-  // FastAPI wrapper can flush logs / close DB cursors. We do NOT wait
-  // synchronously for graceful exit because before-quit is bounded — Electron
-  // gives ~5 s before forcing termination. The second pass force-kills the
-  // tree via taskkill /F /T, ensuring we don't leave orphaned PyInstaller
-  // bootloader processes in Task Manager (the very thing CLAUDE.md item 18
-  // was meant to fix).
+  // killWithEscalation does the SIGTERM → wait grace → taskkill sequence
+  // per worker. Run them in parallel — three workers shutting down
+  // independently is faster than serially, and the 2-second grace window
+  // is shared across the whole shutdown rather than multiplied.
+  await Promise.all(
+    Array.from(handles.values()).map(async (handle) => {
+      if (handle.child && !handle.child.killed) {
+        await killWithEscalation(handle)
+      }
+      handle.status = 'stopped'
+    })
+  )
+}
+
+/**
+ * Synchronous fallback for callers that can't await (none today, but kept
+ * for future compatibility). Loses the graceful-exit window — equivalent
+ * to "kill all, immediately force-kill survivors that haven't run their
+ * exit listeners yet."
+ *
+ * @deprecated Use stopAllWorkersAsync from before-quit with
+ * event.preventDefault() + app.quit() once it resolves.
+ */
+export function stopAllWorkers(): void {
+  isShuttingDown = true
+  if (healthInterval) {
+    clearInterval(healthInterval)
+    healthInterval = null
+  }
   for (const handle of handles.values()) {
     if (handle.child && !handle.child.killed) {
       try {
@@ -405,17 +450,10 @@ export function stopAllWorkers(): void {
       } catch {
         /* dead process: ignore */
       }
+      const pid = handle.child.pid
+      if (pid) forceKillTree(pid)
     }
     handle.status = 'stopped'
-  }
-  // Brief sync sleep is impossible without Atomics + SharedArrayBuffer
-  // gymnastics; instead we go straight to taskkill. Taskkill on a process
-  // that already exited is a fast no-op (a few ms).
-  for (const handle of handles.values()) {
-    const pid = handle.child?.pid
-    if (pid && handle.child?.exitCode === null) {
-      forceKillTree(pid)
-    }
   }
 }
 

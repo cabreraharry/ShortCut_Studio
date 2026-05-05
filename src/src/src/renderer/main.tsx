@@ -26,6 +26,11 @@ const queryClient = new QueryClient({
 // everything (qc.invalidateQueries() with no key) would cause the refetch
 // storm the same audit flagged for the data-source toggle. New
 // mode-sensitive feature queries should add their key prefix here.
+//
+// Predicate is `q.queryKey[0] === prefix`, so subkey-bearing queries
+// (e.g. ['topics', filter]) match too. The first array element MUST be a
+// string for any query that wants to participate; nested-array first
+// elements are not supported.
 const MODE_SENSITIVE_PREFIXES = [
   'topics',
   'topicReview',
@@ -35,11 +40,13 @@ const MODE_SENSITIVE_PREFIXES = [
   'insights-folder-overview',
   'insights-doc-detail',
   'insights-groups',
-  'knowledge-map',
+  'km', // knowledge-map page uses ['km', superCategoryId] as its key
   'folders',
   'progress-summary',
   'progress-jobs',
   'progress-snapshots',
+  'progress-byStage',
+  'dedupSummary',
   'folder-health',
   'dashboard'
 ] as const
