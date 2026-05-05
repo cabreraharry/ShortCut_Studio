@@ -15,6 +15,44 @@ const queryClient = new QueryClient({
   }
 })
 
+// Mode-change broadcast → scoped query invalidation. Without this, an
+// in-flight query started in publ mode could land its response in the
+// priv-mode cache and the user would see private topics with public file
+// counts (the race the production audit flagged). Registering at module
+// scope is intentional: the QueryClient is already a singleton, and the
+// renderer-side broadcast listener is a cheap once-per-process subscription.
+//
+// Scoped to mode-sensitive query key prefixes ONLY — invalidating
+// everything (qc.invalidateQueries() with no key) would cause the refetch
+// storm the same audit flagged for the data-source toggle. New
+// mode-sensitive feature queries should add their key prefix here.
+const MODE_SENSITIVE_PREFIXES = [
+  'topics',
+  'topicReview',
+  'topicDistribution',
+  'superCategories',
+  'insights',
+  'insights-folder-overview',
+  'insights-doc-detail',
+  'insights-groups',
+  'knowledge-map',
+  'folders',
+  'progress-summary',
+  'progress-jobs',
+  'progress-snapshots',
+  'folder-health',
+  'dashboard'
+] as const
+
+window.electronAPI?.mode?.onChanged?.(() => {
+  for (const prefix of MODE_SENSITIVE_PREFIXES) {
+    // predicate match invalidates ['topics'] AND ['topics', subKey, ...].
+    queryClient.invalidateQueries({
+      predicate: (q) => q.queryKey[0] === prefix
+    })
+  }
+})
+
 // Forward uncaught renderer errors to the main-process AppErrors store.
 // Best-effort — if electronAPI is missing the call is just a no-op.
 function reportRendererError(payload: {

@@ -12,7 +12,13 @@ const api: ElectronAPI = {
   },
   mode: {
     get: () => ipcRenderer.invoke(IpcChannel.ModeGet),
-    set: (mode) => ipcRenderer.invoke(IpcChannel.ModeSet, mode)
+    set: (mode) => ipcRenderer.invoke(IpcChannel.ModeSet, mode),
+    onChanged: (cb) => {
+      const listener = (_e: Electron.IpcRendererEvent, mode: import('@shared/types').DbMode) =>
+        cb(mode)
+      ipcRenderer.on(IpcChannel.ModeChanged, listener)
+      return () => ipcRenderer.removeListener(IpcChannel.ModeChanged, listener)
+    }
   },
   dataSource: {
     get: () => ipcRenderer.invoke(IpcChannel.DataSourceGet),

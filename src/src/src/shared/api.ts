@@ -73,6 +73,15 @@ export interface ElectronAPI {
   mode: {
     get: () => Promise<DbMode>
     set: (mode: DbMode) => Promise<void>
+    /**
+     * Subscribe to main-process mode change broadcasts. The callback fires
+     * synchronously after every successful set (whether triggered by this
+     * window or another). Returns an unsubscribe function. The renderer
+     * uses this to keep its `useMode()` hook in sync — without it, an
+     * in-flight query started in publ mode could land its response in
+     * the priv-mode cache slot.
+     */
+    onChanged: (cb: (mode: DbMode) => void) => () => void
   }
   dataSource: {
     get: () => Promise<DataSourceState>

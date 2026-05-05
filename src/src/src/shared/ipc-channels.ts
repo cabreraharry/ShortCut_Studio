@@ -9,6 +9,7 @@ export const IpcChannel = {
   // Mode
   ModeGet: 'mode:get',
   ModeSet: 'mode:set',
+  ModeChanged: 'mode:changed', // main → renderer broadcast on ModeSet
 
   // Data source (Demo vs Prod)
   DataSourceGet: 'dataSource:get',
