@@ -7,6 +7,7 @@ import type {
 import { isLocalProvider } from '@shared/providers'
 import { getLocAdmDb } from '../../db/connection'
 import { recordError } from '../../diagnostics/errorStore'
+import { redactSecrets } from '../../security/redact'
 import { providerCodeFromName } from '../providerName'
 import { claudeAdapter } from './claude'
 import { geminiAdapter } from './gemini'
@@ -259,13 +260,22 @@ export async function complete(req: LlmCompleteRequest): Promise<LlmCompleteResu
       truncated: result.truncated
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
+    // Redact at the boundary, not just inside httpJson — adapters that wrap
+    // httpJson can re-throw with re-decorated messages, and any future
+    // adapter that bypasses httpJson (e.g. talking to a local SDK that
+    // surfaces its own raw HTTP body) would otherwise leak the API key
+    // into errors.db AND into the IPC return field that lands in the
+    // renderer's Diagnostics panel.
+    const rawMessage = err instanceof Error ? err.message : String(err)
+    const message = redactSecrets(rawMessage)
+    const stack =
+      err instanceof Error && err.stack ? redactSecrets(err.stack) : undefined
     recordError({
       source: 'llm',
       severity: 'error',
       category: req.feature ?? 'complete',
       message,
-      stack: err instanceof Error ? err.stack : undefined,
+      stack,
       context: {
         providerId: req.providerId ?? null,
         modelName: req.modelName ?? null,

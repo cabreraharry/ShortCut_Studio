@@ -171,13 +171,18 @@ export function registerLlmHandlers(): void {
           fallback: result.fallback
         }
       } catch (err) {
-        const error =
+        // Redact: a non-AuthFailed error message may include an HTTP body
+        // that echoed our Authorization header (some upstream WAFs do this
+        // under 4xx). The same channel returns to the renderer and lands
+        // in the user-visible toast + AppErrors row, so any leak here
+        // surfaces in two places.
+        const rawError =
           err instanceof AuthFailedError
             ? 'Auth failed — check the API key'
             : err instanceof Error
               ? err.message
               : String(err)
-        return { ok: false, error, latencyMs: Date.now() - start }
+        return { ok: false, error: redactSecrets(rawError), latencyMs: Date.now() - start }
       }
     }
   )
@@ -200,13 +205,18 @@ export function registerLlmHandlers(): void {
         })
         return { ok: true, latencyMs: Date.now() - start }
       } catch (err) {
-        const error =
+        // Redact: a non-AuthFailed error message may include an HTTP body
+        // that echoed our Authorization header (some upstream WAFs do this
+        // under 4xx). The same channel returns to the renderer and lands
+        // in the user-visible toast + AppErrors row, so any leak here
+        // surfaces in two places.
+        const rawError =
           err instanceof AuthFailedError
             ? 'Auth failed — check the API key'
             : err instanceof Error
               ? err.message
               : String(err)
-        return { ok: false, error, latencyMs: Date.now() - start }
+        return { ok: false, error: redactSecrets(rawError), latencyMs: Date.now() - start }
       }
     }
   )
@@ -300,9 +310,13 @@ export function registerLlmHandlers(): void {
         }
         return { ok: true, usdToday: cents / 100 }
       } catch (err) {
+        // Same boundary-redaction principle as the discover/test paths:
+        // a non-JSON 200 (CDN maintenance page, Cloudflare WAF) could
+        // echo the Authorization header into the JSON.parse error message.
+        const rawError = err instanceof Error ? err.message : String(err)
         return {
           ok: false,
-          error: err instanceof Error ? err.message : String(err)
+          error: redactSecrets(rawError)
         }
       }
     }
