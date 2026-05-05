@@ -4,7 +4,8 @@ import { join } from 'node:path'
 import { IpcChannel } from '@shared/ipc-channels'
 import { listDrives } from '../os/drives'
 import { listChildren } from '../os/fs-preview'
-import type { ShellFolder } from '@shared/types'
+import { assertOnLocalDrive, canonicalize } from '../security/safePath'
+import type { FsEntry, ShellFolder } from '@shared/types'
 
 // Resolve the user's common Windows shell folders. Used by the Folders
 // page's drive picker as one-click shortcuts so the user doesn't have to
@@ -31,8 +32,18 @@ function resolveShellFolders(): ShellFolder[] {
 
 export function registerDriveHandlers(): void {
   ipcMain.handle(IpcChannel.SystemListDrives, () => listDrives())
-  ipcMain.handle(IpcChannel.SystemListChildren, (_evt, path: string) =>
-    listChildren(path)
+  ipcMain.handle(
+    IpcChannel.SystemListChildren,
+    async (_evt, path: string): Promise<FsEntry[]> => {
+      // Renderer-supplied path → fs.readdir is the audit's
+      // drive-enumeration / directory-probe vector (P0). Canonicalize +
+      // assert the result is rooted on a local drive letter — UNC paths,
+      // device paths, and traversal trickery are all rejected before
+      // readdir sees the string.
+      const safe = canonicalize(path)
+      await assertOnLocalDrive(safe)
+      return listChildren(safe)
+    }
   )
   ipcMain.handle(IpcChannel.SystemShellFolders, () => resolveShellFolders())
 }
