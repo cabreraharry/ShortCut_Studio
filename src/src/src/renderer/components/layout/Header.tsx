@@ -153,11 +153,42 @@ function DataSourcePill(): JSX.Element {
     queryKey: ['dataSource'],
     queryFn: () => api.dataSource.get()
   })
+  // Mirror of MODE_SENSITIVE_PREFIXES in main.tsx — the data-source flip
+  // affects the same surface area (everything reading from the live DB
+  // connection). qc.invalidateQueries() with NO key invalidates EVERY
+  // active query (~15+ on a typical Dashboard) and refetches in parallel,
+  // also canceling in-flight mutations mid-flight (flicker + double-toasts).
+  // Scope to the prefixes that actually re-issue different data when the
+  // source flips. New data-driven feature queries should add their prefix.
+  // Excluded: ['updater-*'], ['mode'], ['providers'] — these are invariant
+  // across data-source flips.
+  const DATA_SOURCE_INVALIDATE_PREFIXES = [
+    'topics',
+    'topicReview',
+    'topicDistribution',
+    'superCategories',
+    'insights',
+    'insights-folder-overview',
+    'insights-doc-detail',
+    'insights-groups',
+    'knowledge-map',
+    'folders',
+    'progress-summary',
+    'progress-jobs',
+    'progress-snapshots',
+    'folder-health',
+    'dashboard'
+  ] as const
+
   const setSource = useMutation({
     mutationFn: (next: DataSource) => api.dataSource.set(next),
     onSuccess: (state) => {
       qc.setQueryData(['dataSource'], state)
-      qc.invalidateQueries()
+      for (const prefix of DATA_SOURCE_INVALIDATE_PREFIXES) {
+        qc.invalidateQueries({
+          predicate: (q) => q.queryKey[0] === prefix
+        })
+      }
     }
   })
 
