@@ -55,7 +55,20 @@ export function registerFolderHandlers(): void {
       const parentCheck = db.prepare(
         `SELECT 1 AS hit FROM Folder WHERE ? LIKE Path || '%' AND Include = 'Y' LIMIT 1`
       )
-      const added: FolderRow[] = []
+      // Two-pass design: the loc_adm INSERTs run inside one transaction so
+      // the user's "add 5 folders" click is atomic against power-loss /
+      // ROLLBACK. Health computation reads SCLFolder_{Publ,Priv}.db
+      // (a DIFFERENT file the scanner may currently be writing to), so a
+      // throw there must NOT poison the loc_adm transaction. Previously
+      // a busy / missing / corrupted SCLFolder rolled back ALL inserts
+      // and the user lost their add with only a generic toast to show
+      // for it.
+      const insertedRows: Array<{
+        id: number
+        path: string
+        include: 'Y' | 'N'
+        lastUpdCt: number
+      }> = []
       const tx = db.transaction((items: string[]) => {
         for (const p of items) {
           let include: 'Y' | 'N'
@@ -66,20 +79,42 @@ export function registerFolderHandlers(): void {
             include = hasParent?.hit ? 'N' : 'Y'
           }
           const info = insert.run(p, include)
-          const health = getFolderHealthReal(p)
-          added.push({
+          insertedRows.push({
             id: Number(info.lastInsertRowid),
             path: p,
             include,
-            procRound: 0,
-            lastUpdCt: Math.floor(Date.now() / 1000),
-            fileCount: health.fileCount,
-            dupeCount: health.dupeCount,
-            privacyMatchCount: health.privacyMatchCount
+            lastUpdCt: Math.floor(Date.now() / 1000)
           })
         }
       })
       tx(paths)
+
+      // Health pass: a failure here logs but doesn't propagate. The folder
+      // row is already persisted; the user can refresh to recompute health
+      // once the SCLFolder DB is reachable.
+      const added: FolderRow[] = insertedRows.map((row) => {
+        let fileCount = 0
+        let dupeCount = 0
+        let privacyMatchCount = 0
+        try {
+          const health = getFolderHealthReal(row.path)
+          fileCount = health.fileCount
+          dupeCount = health.dupeCount
+          privacyMatchCount = health.privacyMatchCount
+        } catch {
+          /* SCLFolder DB locked / missing — leave zeros; refresh recomputes. */
+        }
+        return {
+          id: row.id,
+          path: row.path,
+          include: row.include,
+          procRound: 0,
+          lastUpdCt: row.lastUpdCt,
+          fileCount,
+          dupeCount,
+          privacyMatchCount
+        }
+      })
       return added
     }
   )
