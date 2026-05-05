@@ -134,7 +134,18 @@ function spawnWorker(handle: WorkerHandle): void {
     'OS',
     'PROCESSOR_ARCHITECTURE',
     'NUMBER_OF_PROCESSORS',
-    'PYTHONIOENCODING' // future-proofing if a worker sets it; not currently used
+    // Locale + Unicode handling for PyInstaller-frozen workers. Without
+    // these, Python's stdio defaults to ASCII on some Windows configs and
+    // breaks on non-ASCII filenames (which is exactly what file-scan and
+    // topic-naming workers receive).
+    'LANG',
+    'LC_ALL',
+    'PYTHONIOENCODING',
+    // Dev-time override that lets workers find their .exe sources at a
+    // non-default path. Read by config.ts:48; pass-through keeps the dev
+    // workflow unbroken even though the value is read in main, not the
+    // worker process — kept for symmetry + future worker-side use.
+    'SCL_WORKERS_DIR'
   ] as const
 
   const env: NodeJS.ProcessEnv = {}

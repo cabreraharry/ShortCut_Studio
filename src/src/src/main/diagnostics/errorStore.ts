@@ -33,10 +33,17 @@ const SECRET_HEADER_KEYS = new Set([
   'session_token'
 ])
 
+// Kept in sync with security/redact.ts. errorStore is the lowest-common-
+// denominator scrubber every recordError() call goes through; if the caller
+// already pre-redacted via redactSecrets() the second pass is a cheap no-op,
+// but for any future call site that forgets to pre-redact, this is the safety
+// net. The HuggingFace pattern (hf_…) was missing in v0.4.x — a worker error
+// containing one would have leaked into errors.db unredacted.
 const SECRET_PATTERNS: RegExp[] = [
   /sk-ant-api[0-9]{2}-[A-Za-z0-9_-]{90,}/g,
   /sk-[A-Za-z0-9_-]{20,}/g,
-  /AIza[0-9A-Za-z_-]{35}/g
+  /AIza[0-9A-Za-z_-]{35}/g,
+  /hf_[A-Za-z0-9]{20,200}/g
 ]
 
 export interface RecordErrorInput {
