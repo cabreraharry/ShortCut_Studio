@@ -8,11 +8,21 @@ import { getLocAdmDb } from './connection'
  * them via new tables if schema drift is detected, but since SQLite
  * treats VARCHAR(50) as TEXT at runtime anyway, the column type string
  * is cosmetic — we only add missing tables/columns here.
+ *
+ * Atomicity contract: the entire migration runs inside one transaction
+ * via db.transaction(). A power-loss / kill-from-Task-Manager / thrown
+ * exception anywhere inside rolls back the whole thing rather than
+ * leaving a partially-seeded DB that subsequent boots can't recover
+ * from idempotently. Inner try/catches around ALTER TABLE remain — the
+ * "column already exists" SQLITE_ERROR doesn't abort a SQLite tx, so
+ * swallowing it locally is still safe and preserves the per-column
+ * idempotency this file relies on.
  */
 export function runMigrations(): void {
   const db = getLocAdmDb()
 
-  db.exec(`
+  db.transaction(() => {
+    db.exec(`
     CREATE TABLE IF NOT EXISTS AdminData (
       RecID INTEGER PRIMARY KEY DEFAULT 1,
       Localhost_Port INTEGER NOT NULL DEFAULT 44999,
@@ -260,4 +270,5 @@ export function runMigrations(): void {
   } catch {
     // column already exists
   }
+  })()
 }
