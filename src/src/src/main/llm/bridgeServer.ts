@@ -1,7 +1,8 @@
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from 'node:http'
-import { randomBytes } from 'node:crypto'
+import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { complete } from './completion'
 import { recordError } from '../diagnostics/errorStore'
+import { redactSecrets } from '../security/redact'
 import type { LlmCompleteRequest } from '@shared/types'
 
 /**
@@ -79,11 +80,20 @@ export async function startLlmBridgeServer(): Promise<void> {
       }
       if (req.method === 'POST' && req.url === '/llm/complete') {
         // Auth — the worker reads the token from ELECTRON_LLM_BRIDGE_TOKEN
-        // and sends it in this header. Constant-time-ish compare via
-        // string equality is fine here: the token is 64 hex chars (256 bits)
-        // and an attacker on this machine can already read SQLite directly.
+        // and sends it in this header. Length-check first, then
+        // timingSafeEqual on the buffers: native string === in V8 short-
+        // circuits on the first mismatched byte, leaking the token byte-
+        // by-byte to a co-resident attacker who can issue many requests
+        // (the exact threat model the token was added to mitigate per
+        // CLAUDE.md item 16). The length check before timingSafeEqual is
+        // safe because token length is a public constant (64 hex chars).
         const provided = req.headers[LLM_BRIDGE_TOKEN_HEADER]
-        if (typeof provided !== 'string' || provided !== getBridgeToken()) {
+        const expected = getBridgeToken()
+        const ok =
+          typeof provided === 'string' &&
+          provided.length === expected.length &&
+          timingSafeEqual(Buffer.from(provided), Buffer.from(expected))
+        if (!ok) {
           sendJson(res, 401, { ok: false, error: 'unauthorized' })
           return
         }
@@ -106,13 +116,20 @@ export async function startLlmBridgeServer(): Promise<void> {
       }
       sendJson(res, 404, { ok: false, error: 'Not found' })
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
+      // Same boundary-redaction principle as completion/index.ts: a worker
+      // sees the 500 response body, and the message also lands in errors.db.
+      // Either path leaks if a wrapped provider error reached here with
+      // raw key fragments still in the message.
+      const rawMessage = err instanceof Error ? err.message : String(err)
+      const message = redactSecrets(rawMessage)
+      const stack =
+        err instanceof Error && err.stack ? redactSecrets(err.stack) : undefined
       recordError({
         source: 'llm',
         severity: 'error',
         category: 'bridge',
         message,
-        stack: err instanceof Error ? err.stack : undefined,
+        stack,
         context: { url: req.url ?? null, method: req.method ?? null }
       })
       sendJson(res, 500, { ok: false, error: message })

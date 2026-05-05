@@ -103,18 +103,54 @@ function spawnWorker(handle: WorkerHandle): void {
     return
   }
 
-  const env: NodeJS.ProcessEnv = {
-    ...process.env,
-    WORKER_HEALTH_PORT: String(cfg.healthPort),
-    // Tell the worker where Electron's loopback LLM bridge is listening.
-    // Workers route all completion calls through the bridge so they don't
-    // hold provider API keys themselves.
-    ELECTRON_LLM_BRIDGE_PORT: String(LLM_BRIDGE_PORT),
-    // Per-launch shared secret. Workers send it as the X-SCS-Bridge-Token
-    // header on every /llm/complete POST. Without this, any local process
-    // could call the bridge and burn the user's API budget anonymously.
-    ELECTRON_LLM_BRIDGE_TOKEN: getBridgeToken()
+  // Build a minimal env for the worker process rather than spreading
+  // ...process.env. Spreading the full env would propagate every secret
+  // the user happens to have in their shell — AWS_ACCESS_KEY_ID,
+  // GH_TOKEN, OPENAI_API_KEY (some users set this even though SCS doesn't
+  // need it at the env level), arbitrary aliases, Visual Studio
+  // PATH-pollution, etc. — to the worker, and from there to any grand-
+  // children the worker spawns (PyInstaller's restored interpreter, OCR
+  // subprocesses). The minimal-env approach limits the worker's view of
+  // the parent to what Python on Windows actually needs to run.
+  //
+  // Note: the bridge token still flows from supervisor → worker (it has
+  // to, the worker authenticates against it). Workers MUST NOT propagate
+  // it to their own subprocesses — see SCL_Demo/tools/electron_llm_client.py
+  // for the contract on the worker side.
+  const PASSTHROUGH_KEYS = [
+    'PATH',
+    'SystemRoot', // case-sensitive on Windows env-block lookups in some APIs
+    'WINDIR',
+    'COMSPEC',
+    'TEMP',
+    'TMP',
+    'USERPROFILE',
+    'APPDATA',
+    'LOCALAPPDATA',
+    'HOMEDRIVE',
+    'HOMEPATH',
+    'USERNAME',
+    'COMPUTERNAME',
+    'OS',
+    'PROCESSOR_ARCHITECTURE',
+    'NUMBER_OF_PROCESSORS',
+    'PYTHONIOENCODING' // future-proofing if a worker sets it; not currently used
+  ] as const
+
+  const env: NodeJS.ProcessEnv = {}
+  for (const key of PASSTHROUGH_KEYS) {
+    const value = process.env[key]
+    if (value !== undefined) env[key] = value
   }
+  env.WORKER_HEALTH_PORT = String(cfg.healthPort)
+  // Tell the worker where Electron's loopback LLM bridge is listening.
+  // Workers route all completion calls through the bridge so they don't
+  // hold provider API keys themselves.
+  env.ELECTRON_LLM_BRIDGE_PORT = String(LLM_BRIDGE_PORT)
+  // Per-launch shared secret. Workers send it as the X-SCS-Bridge-Token
+  // header on every /llm/complete POST. Without this, any local process
+  // could call the bridge and burn the user's API budget anonymously.
+  env.ELECTRON_LLM_BRIDGE_TOKEN = getBridgeToken()
   // In packaged builds, point the Python worker's data-root resolver at the
   // per-user seed location. Without this, the resolver walks up from
   // sys.executable looking for a `db_files/` ancestor — which doesn't exist
