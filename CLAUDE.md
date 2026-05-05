@@ -204,7 +204,7 @@ The installer changed from a self-contained NSIS bundle to a `nsis-web` two-piec
 - **AWS infra** ([infra/aws/](infra/aws/)) — Terraform for S3 bucket, CloudFront distribution, manifest Lambda, telemetry Lambda + SQS, IAM publisher user. ~$5/mo at <10 k MAU.
 - **Publish pipeline** ([scripts/publish-release.mjs](src/src/scripts/publish-release.mjs)) — reads `release-builds/nsis-web/`, computes SHAs, renders manifest from [build/fallback-manifest.json](src/src/build/fallback-manifest.json) template, uploads + invalidates. [scripts/set-rollout.mjs](src/src/scripts/set-rollout.mjs) manages the staged-rollout percentage.
 
-The `infra/aws/` Terraform stack is for the **auto-updater** specifically. The IPFS bootstrap fleet + Cloudflare-fronted nginx static-JSON origin Erland's docs describe (for swarm-distributed payloads at scale) live in a separate top-level project at `D:\Client-Side_Project\IPFS_Nginx_Infra\` once that work begins.
+The `infra/aws/` Terraform stack is for the **auto-updater** specifically. The IPFS bootstrap fleet + Cloudflare-fronted nginx static-JSON origin Erland's docs describe (for swarm-distributed payloads at scale) live in a separate top-level project at `D:\Client-Side_Project\SCS-Polaris\` (renamed from `IPFS_Nginx_Infra` on 2026-05-05; GitHub: https://github.com/cabreraharry/SCS-Polaris).
 
 ## Coding Conventions
 
