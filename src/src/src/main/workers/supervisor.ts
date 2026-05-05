@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from 'node:child_process'
+import { spawn, spawnSync, type ChildProcess } from 'node:child_process'
 import { app, net } from 'electron'
 import type { WorkerStatus } from '@shared/types'
 import { sclDataRootDir } from '../db/scl-folder'
@@ -310,6 +310,76 @@ export function startWorkerSupervisor(): void {
   }, HEALTH_POLL_MS)
 }
 
+/**
+ * Force-kill a child process tree on Windows via taskkill /F /T. Falls back
+ * to process.kill(pid, 'SIGKILL') on POSIX. spawnSync is intentional — this
+ * is called from synchronous shutdown paths (before-quit) where we need
+ * the kill to actually complete, not be queued for later.
+ *
+ * Important: /T tells taskkill to terminate the entire process tree, not
+ * just the parent. PyInstaller-frozen .exes spawn a bootloader subprocess
+ * holding the unpacked interpreter; without /T the bootloader survives and
+ * the next launch can fail to bind the worker's healthPort.
+ */
+function forceKillTree(pid: number): void {
+  try {
+    if (process.platform === 'win32') {
+      spawnSync('taskkill', ['/F', '/T', '/PID', String(pid)], {
+        windowsHide: true,
+        timeout: 5000
+      })
+    } else {
+      process.kill(pid, 'SIGKILL')
+    }
+  } catch {
+    /* PID already gone, taskkill missing, or permission denied — accept
+       that we may leak a stale process; better than throwing in shutdown. */
+  }
+}
+
+/**
+ * Wait for a child to exit, escalating to SIGKILL/taskkill on timeout.
+ * Returns when the child has exited or the force-kill timeout has elapsed
+ * (whichever comes first). Used by restartWorker so we never spawn a
+ * replacement while the previous instance still holds the worker port.
+ */
+async function killWithEscalation(
+  handle: WorkerHandle,
+  graceMs = 2000,
+  forceMs = 1500
+): Promise<void> {
+  const child = handle.child
+  if (!child || child.killed || child.exitCode !== null) return
+
+  const exited = new Promise<void>((resolve) => {
+    if (child.exitCode !== null) {
+      resolve()
+      return
+    }
+    child.once('exit', () => resolve())
+  })
+
+  try {
+    child.kill()
+  } catch {
+    /* already dead */
+  }
+
+  const gracefullyExited = await Promise.race([
+    exited.then(() => true),
+    new Promise<boolean>((r) => setTimeout(() => r(false), graceMs))
+  ])
+  if (gracefullyExited) return
+
+  pushLog(handle, `[supervisor] ${handle.config.name} did not exit on SIGTERM; force-killing tree`)
+  if (child.pid) forceKillTree(child.pid)
+
+  await Promise.race([
+    exited,
+    new Promise<void>((r) => setTimeout(r, forceMs))
+  ])
+}
+
 export function stopAllWorkers(): void {
   // Set the shutdown flag BEFORE killing children. The exit handler's
   // setTimeout-restart path checks this flag and bails out, so a worker that
@@ -320,11 +390,32 @@ export function stopAllWorkers(): void {
     clearInterval(healthInterval)
     healthInterval = null
   }
+  // SIGTERM-then-taskkill in two passes. The first pass is graceful: every
+  // worker gets a kill() that triggers Python's signal handlers, so the
+  // FastAPI wrapper can flush logs / close DB cursors. We do NOT wait
+  // synchronously for graceful exit because before-quit is bounded — Electron
+  // gives ~5 s before forcing termination. The second pass force-kills the
+  // tree via taskkill /F /T, ensuring we don't leave orphaned PyInstaller
+  // bootloader processes in Task Manager (the very thing CLAUDE.md item 18
+  // was meant to fix).
   for (const handle of handles.values()) {
     if (handle.child && !handle.child.killed) {
-      handle.child.kill()
+      try {
+        handle.child.kill()
+      } catch {
+        /* dead process: ignore */
+      }
     }
     handle.status = 'stopped'
+  }
+  // Brief sync sleep is impossible without Atomics + SharedArrayBuffer
+  // gymnastics; instead we go straight to taskkill. Taskkill on a process
+  // that already exited is a fast no-op (a few ms).
+  for (const handle of handles.values()) {
+    const pid = handle.child?.pid
+    if (pid && handle.child?.exitCode === null) {
+      forceKillTree(pid)
+    }
   }
 }
 
@@ -347,14 +438,23 @@ export function getWorkerStatuses(): WorkerStatus[] {
 export async function restartWorker(name: string): Promise<void> {
   const handle = handles.get(name)
   if (!handle) return
+  // Honour the shutdown flag — restartWorker is reachable from the IPC
+  // handler the Diagnostics panel wires; the user could click "Restart"
+  // and immediately quit. Without this guard, the spawnWorker() at the
+  // end of this function would start a fresh process AFTER stopAllWorkers
+  // has run, leaving the orphan we documented in CLAUDE.md item 18.
+  if (isShuttingDown) return
   if (handle.child && !handle.child.killed) {
     // Tell the exit handler to skip its auto-respawn — otherwise we end up
     // with two processes (one from the exit-handler setTimeout, one from
     // spawnWorker below) fighting for the worker's port.
     handle.manualRestartInProgress = true
-    handle.child.kill()
-    await new Promise((r) => setTimeout(r, 500))
+    // killWithEscalation waits for actual exit (or force-kills the tree on
+    // 2 s timeout) before returning, so spawnWorker below never races a
+    // still-alive previous instance for the worker's healthPort.
+    await killWithEscalation(handle)
   }
+  if (isShuttingDown) return
   handle.restartCount = 0
   spawnWorker(handle)
 }
