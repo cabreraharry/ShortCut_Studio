@@ -252,8 +252,11 @@ export interface FileTypeFilter {
 export interface LlmProvider {
   providerId: number
   providerName: string
+  // The actual API key value NEVER crosses the IPC boundary — it lives only
+  // in the main-process SQLite row and is read on demand for outbound HTTP.
+  // The renderer learns whether a key is configured via hasApiKey and
+  // updates it via the write-only LlmUpdateKey channel.
   hasApiKey: 'Y' | 'N'
-  apiKey: string
   apiHost: string
   isDefault: 'Y' | 'N'
   supported: 'Y' | 'N'

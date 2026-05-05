@@ -33,11 +33,16 @@ interface ModelDbRow {
 }
 
 function toProvider(r: ProviderDbRow): LlmProvider {
+  // Intentionally omits API_Key — it never leaves the main process. The
+  // renderer can only ask "is a key set?" (hasApiKey) and write a new one
+  // (LlmUpdateKey channel). Reading the existing value back is not
+  // supported by design; the corresponding "Replace key" UX flow lets the
+  // user paste a fresh value without ever needing the old one in renderer
+  // memory.
   return {
     providerId: r.Provider_ID,
     providerName: r.Provider_Name,
     hasApiKey: r.Has_API_Key,
-    apiKey: r.API_Key,
     apiHost: r.API_Host,
     isDefault: r.IsDefault,
     supported: r.Supported,

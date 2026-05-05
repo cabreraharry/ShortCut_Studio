@@ -249,7 +249,12 @@ function ProviderCard({
 }) {
   const qc = useQueryClient()
   const [showKey, setShowKey] = useState(false)
-  const [keyDraft, setKeyDraft] = useState(provider.apiKey)
+  // The input always starts empty — provider.apiKey no longer crosses the
+  // IPC boundary, so the renderer cannot pre-fill the existing value. A
+  // configured key is presented as a placeholder ("Key configured — paste
+  // a new one to replace") rather than the actual stored value. The user
+  // can verify the key works via the Test button without ever seeing it.
+  const [keyDraft, setKeyDraft] = useState('')
   const [testResult, setTestResult] = useState<LlmTestResult | null>(null)
   const [discoverResult, setDiscoverResult] = useState<LlmDiscoverResult | null>(null)
   // Transient "Saved" check next to the key input — fires on a successful
@@ -270,6 +275,12 @@ function ProviderCard({
     mutationFn: (key: string) => api.llm.updateKey(provider.providerId, key),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['providers'] })
+      // Clear the draft post-save so the freshly-pasted secret doesn't
+      // linger in renderer state any longer than necessary. Re-pasting is
+      // also the only way to overwrite a stored key, so empty-after-save
+      // matches the intended UX (placeholder reads "Key configured…").
+      setKeyDraft('')
+      setShowKey(false)
       setKeySaved(true)
       if (savedTimer.current) window.clearTimeout(savedTimer.current)
       savedTimer.current = window.setTimeout(() => setKeySaved(false), 1800)
@@ -316,7 +327,10 @@ function ProviderCard({
   }
 
   const persistKeyIfDirty = (): void => {
-    if (keyDraft !== provider.apiKey) updateKey.mutate(keyDraft)
+    // The renderer no longer holds the stored key, so "dirty" simply means
+    // "the user typed something." An empty blur is treated as a no-op so
+    // tabbing past the input doesn't accidentally clear an existing key.
+    if (keyDraft !== '') updateKey.mutate(keyDraft)
   }
 
   // Test gate: don't fire while a key save is in flight; the test would
@@ -419,7 +433,11 @@ function ProviderCard({
               type={showKey ? 'text' : 'password'}
               value={keyDraft}
               onChange={(e) => onKeyChange(e.target.value)}
-              placeholder={guide?.keyPlaceholder ?? 'Paste API key'}
+              placeholder={
+                hasKey
+                  ? 'Key configured — paste a new one to replace'
+                  : guide?.keyPlaceholder ?? 'Paste API key'
+              }
               className="pr-10 font-mono text-xs"
               onBlur={persistKeyIfDirty}
             />
