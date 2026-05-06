@@ -2,6 +2,20 @@
 
 If you're a future Claude session (or a human developer) about to add a feature or fix a bug, **read this before touching anything**. These are the traps.
 
+## Production-readiness review chain (2026-05-06, complete)
+
+Thirteen commits of focused security + reliability hardening, capped by a three-tier reviewer escalation. Chain summary:
+
+- **Tier 1** — security/reliability batch: `390fbb5` `e45e312` `64e7da7` `6f8e67b`. Reviewer pass on these surfaced two follow-ups → `e3f6101`.
+- **Tier 2** — second batch: `a04e6f4` `3dd9693` `9fe6f54` `1244a7d` `4bc4b0d` `e2607ca` `fc96b80`. Reviewer pass surfaced 2 blockers + 4 concerns → `59509fe`.
+- **Tier 3** — fresh-eyes pass on `a04e6f4^..59509fe` (the full Tier 2 batch + the Tier 2 follow-up). 0 blockers, 2 concerns, 0 false-positives. Both concerns fixed in a single follow-up commit:
+  - `MODE_SENSITIVE_PREFIXES` was missing `filter-preview` and `filter-all-files`. Filter Workbench would show stale data from the wrong DB after a Public↔Private flip until the page remounted. Two strings added at [main.tsx:51](../../src/src/src/renderer/main.tsx#L51).
+  - `assertNotExecutable` extracted the extension via `lastIndexOf('.')` on the full path, so a dotted parent dir (e.g. `C:\some.dir\myfile`) produced a "extension" containing a path separator. Currently safe (no false-extension matches the blocklist), but structurally wrong and would break if the blocklist is ever extended with multi-segment extensions like `.tar.gz`. Switched to Node's `path.extname()`, which operates on the basename only ([safePath.ts:92-100](../../src/src/src/main/security/safePath.ts#L92-L100)).
+
+**State after Tier 3:** production-readiness thread is caught up. No outstanding reviewer findings against the 2026-05-06 working set. The pattern (each tier surfaces a few concerns about the previous tier's fixes, finding-count decays each round: many → 2 → 6 → 2) suggests a fourth tier would yield diminishing returns; trigger one only if a future change reopens the surface.
+
+**Reviewer-false-positives ledger** — additions from this round: none. Existing entries (NSIS Components page Abort fall-through, NavLink hash matching, Theme localStorage flash, Sandbox disabled, Migration `'Claude, Anthropic'` rename, ExecEngine optimistic-connected race, Startup hidden-flag dual-probe race) still stand.
+
 ## Critical review + fix sweep (2026-04-30, late)
 
 User asked for a comprehensive code review + intensive testing pass + fix any real bugs / weak points / UI-UX gaps surfaced. Three parallel investigations ran (focused diff review, security audit, main-process bug hunt). Together they surfaced ~22 findings; this commit shipped only the high-confidence real bugs and the security hardening that matters for the single-user local threat model. False-positive findings are explicitly NOT changed and documented in the plan file (`.claude/plans/hi-my-colleague-and-streamed-shamir.md`) so they don't get re-litigated.

@@ -48,7 +48,9 @@ const MODE_SENSITIVE_PREFIXES = [
   'progress-byStage',
   'dedupSummary',
   'folder-health',
-  'dashboard'
+  'dashboard',
+  'filter-preview',
+  'filter-all-files'
 ] as const
 
 window.electronAPI?.mode?.onChanged?.(() => {

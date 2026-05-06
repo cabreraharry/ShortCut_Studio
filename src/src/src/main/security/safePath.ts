@@ -1,4 +1,4 @@
-import { resolve } from 'node:path'
+import { extname, resolve } from 'node:path'
 import { listDrives } from '../os/drives'
 
 /**
@@ -90,9 +90,10 @@ export function canonicalize(input: unknown): string {
  * the file rather than opening it in its registered viewer.
  */
 export function assertNotExecutable(path: string): void {
-  const idx = path.lastIndexOf('.')
-  if (idx === -1) return
-  const ext = path.substring(idx).toLowerCase()
+  // extname() operates on the basename, so a dot in a parent dir
+  // (`C:\some.dir\myfile`) doesn't get mistaken for the file extension.
+  const ext = extname(path).toLowerCase()
+  if (ext === '') return
   if (EXECUTABLE_EXTENSIONS.has(ext)) {
     throw new UnsafePathError(`refusing to open executable file (${ext})`)
   }
