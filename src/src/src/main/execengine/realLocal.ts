@@ -10,7 +10,12 @@ import type {
   TopicDistribution,
   TopicReviewItem
 } from '@shared/types'
-import { getLocalProgressCounts, getStageProgressCounts } from '../db/scl-folder'
+import {
+  getLocalProgressCounts,
+  getRealTopicDistribution,
+  getRealTopicReview,
+  getStageProgressCounts
+} from '../db/scl-folder'
 import type { IExecEngineClient } from './client'
 import { MockExecEngineClient } from './mock'
 
@@ -107,12 +112,15 @@ export class RealLocalExecEngineClient implements IExecEngineClient {
     return this.mock.setIpfsAllocation(gb)
   }
 
-  getTopicReview(): Promise<TopicReviewItem[]> {
-    return this.mock.getTopicReview()
+  async getTopicReview(): Promise<TopicReviewItem[]> {
+    // Read real Files.TopicNames; empty array when no labelled files yet.
+    // We deliberately do NOT fall back to mock data — fake topics would
+    // confuse a real user staring at a fresh install.
+    return getRealTopicReview()
   }
 
-  getTopicDistribution(): Promise<TopicDistribution[]> {
-    return this.mock.getTopicDistribution()
+  async getTopicDistribution(): Promise<TopicDistribution[]> {
+    return getRealTopicDistribution()
   }
 
   rejectTopic(topicName: string): Promise<void> {

@@ -3,6 +3,8 @@ import { existsSync, statSync } from 'node:fs'
 import { IpcChannel } from '@shared/ipc-channels'
 import { getLocAdmDb } from '../db/connection'
 import { getFolderHealthReal } from '../db/scl-folder'
+import { getMode } from './mode'
+import { enqueueScan } from '../workers/scanRunner'
 import type { FolderRow } from '@shared/types'
 
 function assertFolder(path: string): void {
@@ -88,6 +90,27 @@ export function registerFolderHandlers(): void {
         }
       })
       tx(paths)
+
+      // Kick off a background scan for each newly-included folder. Scans
+      // run in filescanner.exe subprocesses (see workers/scanRunner.ts);
+      // this loop returns immediately. OCR_Process tracks progress, the
+      // dashboard's Active jobs card surfaces it via the existing 3s poll,
+      // and a notification fires on completion. Excluded folders are
+      // skipped because the user opted them out — re-enabling Include
+      // doesn't trigger a scan today (defer to a "Scan now" button).
+      const mode = getMode()
+      for (const row of insertedRows) {
+        if (row.include === 'Y') {
+          try {
+            enqueueScan({ targetFolder: row.path, mode })
+          } catch {
+            // Never let a scan-spawn failure poison the IPC return — the
+            // loc_adm row is already persisted, scanRunner's recordError
+            // handler captured the diagnostic, and the user can re-trigger
+            // by removing+re-adding once they fix the underlying issue.
+          }
+        }
+      }
 
       // Health pass: a failure here logs but doesn't propagate. The folder
       // row is already persisted; the user can refresh to recompute health

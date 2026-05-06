@@ -8,6 +8,7 @@ import { initErrorsDb, closeErrorsDb } from './db/errorsConnection'
 import { runMigrations } from './db/migrations'
 import { startWorkerSupervisor, stopAllWorkersAsync } from './workers/supervisor'
 import { startDriveWatcher, stopDriveWatcher } from './drives/watcher'
+import { cancelAllScans } from './workers/scanRunner'
 import { startLlmBridgeServer, stopLlmBridgeServer } from './llm/bridgeServer'
 import { recordError } from './diagnostics/errorStore'
 import { notify } from './notifications/dispatch'
@@ -210,6 +211,7 @@ async function shutdownAndQuit(): Promise<void> {
   destroyTray()
   stopUpdater()
   stopDriveWatcher()
+  cancelAllScans()
   // killWithEscalation gives each worker up to 2 s to exit cleanly on
   // SIGTERM before taskkill /F /T. Run in parallel — three workers
   // shutting down independently is faster than serially.

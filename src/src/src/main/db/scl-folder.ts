@@ -11,7 +11,9 @@ import type {
   InsightsListParams,
   InsightsListResult,
   InsightsSortKey,
-  SortDirection
+  SortDirection,
+  TopicDistribution,
+  TopicReviewItem
 } from '@shared/types'
 
 /**
@@ -467,6 +469,95 @@ export function getStageProgressCounts(): {
     },
     { totalFiles: 0, scan: 0, llm: 0, km: 0 }
   )
+}
+
+/**
+ * Topic review queue: topics gemini_processor has assigned to files but
+ * topic_watchdog / manageLink hasn't yet promoted to the TopicNames table.
+ * Once promoted, a topic shows up in TopicsList (the materialised dimension);
+ * before promotion, it lives here so the user can see what was just inferred.
+ *
+ * One row per distinct Files.TopicNames value, with the highest-confidence
+ * sample for that topic. Empty when no scans + topic generation have run yet.
+ */
+export function getRealTopicReview(): TopicReviewItem[] {
+  return withSclFolderDb<TopicReviewItem[]>((db) => {
+    const rows = db
+      .prepare(
+        `WITH topical AS (
+           SELECT f.TopicNames AS topic,
+                  f.FileID, f.FileName, f.SearchText, f.LinkName, f.Probability
+             FROM Files f
+            WHERE f.IgnoreFile = 'N'
+              AND f.Probability > 0
+              AND f.TopicNames IS NOT NULL
+              AND f.TopicNames != ''
+              AND NOT EXISTS (
+                SELECT 1 FROM TopicNames tn WHERE tn.TopicName = f.TopicNames
+              )
+         ),
+         ranked AS (
+           SELECT t.*,
+                  ROW_NUMBER() OVER (PARTITION BY t.topic ORDER BY t.Probability DESC, t.FileID) AS rk,
+                  COUNT(*) OVER (PARTITION BY t.topic) AS topicFileCount,
+                  AVG(t.Probability * 1.0) OVER (PARTITION BY t.topic) AS avgConfidence
+             FROM topical t
+         )
+         SELECT topic, FileID, FileName, SearchText, LinkName, avgConfidence, topicFileCount
+           FROM ranked
+          WHERE rk = 1
+          ORDER BY avgConfidence DESC, topicFileCount DESC
+          LIMIT 50`
+      )
+      .all() as Array<{
+        topic: string
+        FileID: number
+        FileName: string | null
+        SearchText: string | null
+        LinkName: string | null
+        avgConfidence: number | null
+        topicFileCount: number
+      }>
+
+    return rows.map((r) => {
+      // Sample 3 filenames per topic (the highest-prob row already chosen
+      // is representative; pulling a per-topic sublist costs another query).
+      // Leaving sampleFiles empty keeps the row payload tight.
+      return {
+        suggestedTopic: r.topic,
+        fileId: r.FileID,
+        fileName: r.FileName ?? '(no filename)',
+        searchText: r.SearchText ?? '',
+        linkName: r.LinkName ?? '',
+        confidence: r.avgConfidence != null ? r.avgConfidence / 100 : undefined,
+        sampleFiles: r.FileName ? [r.FileName] : []
+      }
+    })
+  }, [])
+}
+
+/**
+ * Topic distribution chart data: file count per topic, descending.
+ * Reads directly from Files.TopicNames (gemini_processor's raw output)
+ * rather than the TopicNames table, so the chart is populated as soon as
+ * the LLM labels files — no waiting for topic_watchdog promotion.
+ */
+export function getRealTopicDistribution(): TopicDistribution[] {
+  return withSclFolderDb<TopicDistribution[]>((db) => {
+    const rows = db
+      .prepare(
+        `SELECT TopicNames AS topic, COUNT(*) AS fileCount
+           FROM Files
+          WHERE IgnoreFile = 'N'
+            AND TopicNames IS NOT NULL
+            AND TopicNames != ''
+          GROUP BY TopicNames
+          ORDER BY fileCount DESC, topic ASC
+          LIMIT 30`
+      )
+      .all() as Array<{ topic: string; fileCount: number }>
+    return rows.map((r) => ({ topic: r.topic, fileCount: r.fileCount }))
+  }, [])
 }
 
 /**
