@@ -27,6 +27,12 @@ extraResources:
       - root_watchdog.exe
       - topic_watchdog.exe
       - gemini_processor.exe
+      # filescanner is on-demand (spawned by main/workers/scanRunner.ts when
+      # the user adds a folder), not supervised. Without this entry it would
+      # be missing from <resourcesPath>/workers/ in packaged builds and
+      # FoldersAdd would fire a "filescanner.exe not found" notification on
+      # every add.
+      - filescanner.exe
   # SCL_Demo data-root seed — copied to <userData>/scl_data/db_files/ on first
   # launch by scl-folder.ts. The supervisor sets SCL_DEMO_DATA_ROOT to that
   # path so the Python workers' resolver short-circuits to it instead of
