@@ -317,7 +317,7 @@ function FoldersCard() {
             />
           </CardTitle>
           <CardDescription>
-            Green rows are indexed. Orange rows are excluded — they win over any parent include rule.
+            Each row has a switch on the left — on means the folder gets scanned, off means it stays out. An off (Excluded) row under an on (Included) parent still wins.
           </CardDescription>
         </div>
         <Button onClick={() => setDriveModalOpen(true)}>
@@ -453,7 +453,12 @@ function FolderRowItem({
     <div
       className={cn(
         'flex items-center gap-3 px-4 py-2 text-sm',
-        isIncluded ? 'bg-emerald-500/5' : 'bg-amber-500/5',
+        // Row tinting is reserved for the multi-select state. The previous
+        // emerald/amber tinting on Include/Exclude read as semantic
+        // (success/warning) when those are really just on/off positions of
+        // a toggle. The Switch + label below is now the only signal for
+        // include state, which is consistent with how every other on/off
+        // toggle in the app communicates its state.
         selected && 'bg-primary/10'
       )}
     >
@@ -478,7 +483,10 @@ function FolderRowItem({
             />
             <span className={cn(
               'text-[10px] font-semibold uppercase tracking-wider',
-              isIncluded ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
+              // Brand-blue when the toggle is ON, muted grey when OFF.
+              // Avoids the previous green=good / amber=warning mental model
+              // — neither value here is a problem state.
+              isIncluded ? 'text-primary' : 'text-muted-foreground'
             )}>
               {isIncluded ? 'Included' : 'Excluded'}
             </span>

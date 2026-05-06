@@ -56,8 +56,13 @@ async function pollOnce(): Promise<void> {
 
     if (!exists && !knownMissing.has(row.Path)) {
       knownMissing.add(row.Path)
+      // 'warning' rather than 'error': a folder going temporarily
+      // unreachable (USB unplugged, network drive offline, share
+      // disconnected) is normal day-to-day behaviour, not a system
+      // failure. The amber icon communicates "heads up" without the
+      // alarm bells of a red error icon.
       notify({
-        severity: 'error',
+        severity: 'warning',
         source: 'drive',
         title: 'Folder unavailable',
         body: `${row.Path} can no longer be reached. Scan coverage will be reduced until it returns.`,

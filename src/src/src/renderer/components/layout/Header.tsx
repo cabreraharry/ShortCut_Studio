@@ -132,14 +132,17 @@ function UpdateAvailablePill(): JSX.Element | null {
     <Tip content={`v${status.availableVersion} is available — click for details`}>
       {/* Apply badgeVariants directly to the <button> so the focus ring
           aligns with the visible pill instead of floating around an outer
-          wrapper. The 'info' variant matches the previous amber styling. */}
+          wrapper. Uses the 'accent' (brand-blue) variant — "Update ready"
+          is positive news, not a caution flag, so the previous amber
+          styling read as a warning when it's really an invitation to
+          install. */}
       <button
         type="button"
         onClick={() => navigate('/settings')}
         aria-label="Update ready"
         className={cn(
-          badgeVariants({ variant: 'info' }),
-          'gap-1 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider hover:bg-amber-500/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+          badgeVariants({ variant: 'accent' }),
+          'gap-1 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider hover:bg-primary/25 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
         )}
       >
         <Sparkles className="h-3 w-3" />
