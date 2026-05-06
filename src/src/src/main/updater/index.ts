@@ -65,8 +65,41 @@ function broadcastStatus(): void {
 }
 
 function setState(next: UpdaterState): void {
+  const prev = internal.state
   internal.state = next
   broadcastStatus()
+  // Fire user-facing notifications on the transitions that change what the
+  // user can / should do, not on every internal state move. Done lazily here
+  // (not in a separate state-machine module) because there are only three
+  // transitions worth surfacing.
+  try {
+    // Lazy import to avoid loading dispatch.ts during early boot before the
+    // BrowserWindow exists.
+    import('../notifications/dispatch')
+      .then(({ notify }) => {
+        if (prev !== 'update-available' && next === 'update-available') {
+          const v = internal.manifest?.app.version ?? ''
+          notify({
+            severity: 'info',
+            source: 'updater',
+            title: v ? `Update available — v${v}` : 'Update available',
+            body: 'Click to install. The current session will restart.',
+            action: { kind: 'navigate', target: '/settings#updates' }
+          })
+        } else if (prev !== 'error' && next === 'error') {
+          notify({
+            severity: 'error',
+            source: 'updater',
+            title: 'Update download failed',
+            body: internal.lastError ?? 'Unknown error.',
+            action: { kind: 'navigate', target: '/settings#updates' }
+          })
+        }
+      })
+      .catch(() => {})
+  } catch {
+    /* swallow */
+  }
 }
 
 export function getStatus(): UpdaterStatus {

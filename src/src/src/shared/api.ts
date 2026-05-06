@@ -1,5 +1,6 @@
 import type { ComponentId, ComponentStatus } from './components-manifest'
 import type {
+  AppNotification,
   AppSettings,
   ClassifiedFilename,
   ClassifyRequest,
@@ -36,6 +37,9 @@ import type {
   Job,
   KnowledgeMapGraph,
   KnowledgeMapParams,
+  NotificationAction,
+  NotificationListQuery,
+  NotificationListResult,
   LlmCompleteRequest,
   LlmCompleteResult,
   LlmDiscoverResult,
@@ -228,6 +232,19 @@ export interface ElectronAPI {
     check: () => Promise<UpdaterStatus>
     apply: () => Promise<UpdaterStatus>
     onStatusChanged: (cb: (status: UpdaterStatus) => void) => () => void
+  }
+  notifications: {
+    list: (query?: NotificationListQuery) => Promise<NotificationListResult>
+    markRead: (id: number | 'all') => Promise<{ ok: true }>
+    dismiss: (id: number | 'all') => Promise<{ dismissed: number }>
+    unreadCount: () => Promise<number>
+    getMute: () => Promise<boolean>
+    setMute: (muted: boolean) => Promise<{ muted: boolean }>
+    test: () => Promise<AppNotification | null>
+    /** Subscribe to new notification broadcasts (badge refresh / live drawer). */
+    onNew: (cb: (n: AppNotification) => void) => () => void
+    /** Subscribe to OS-toast click action payloads (route navigation). */
+    onClickAction: (cb: (action: NotificationAction) => void) => () => void
   }
 }
 

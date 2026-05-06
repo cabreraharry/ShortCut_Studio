@@ -270,5 +270,16 @@ export function runMigrations(): void {
   } catch {
     // column already exists
   }
+  // Global mute for the notification system. 0 = OS toasts fire, 1 = silent
+  // (in-app drawer entries are still recorded). User toggles this from
+  // Settings → Notifications. Per-source mute is intentionally out of scope
+  // for v1.
+  try {
+    db.prepare(
+      'ALTER TABLE AdminData ADD COLUMN NotificationsMuted INTEGER NOT NULL DEFAULT 0'
+    ).run()
+  } catch {
+    // column already exists
+  }
   })()
 }

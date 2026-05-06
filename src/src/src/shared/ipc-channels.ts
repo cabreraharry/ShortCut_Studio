@@ -143,7 +143,18 @@ export const IpcChannel = {
   UpdaterStatus: 'updater:status',
   UpdaterCheck: 'updater:check',
   UpdaterApply: 'updater:apply',
-  UpdaterStatusChanged: 'updater:status-changed' // main → renderer event
+  UpdaterStatusChanged: 'updater:status-changed', // main → renderer event
+
+  // Notification system (OS toasts + in-app center)
+  NotificationsList: 'notifications:list',
+  NotificationsMarkRead: 'notifications:mark-read',
+  NotificationsDismiss: 'notifications:dismiss',
+  NotificationsUnreadCount: 'notifications:unread-count',
+  NotificationsGetMute: 'notifications:get-mute',
+  NotificationsSetMute: 'notifications:set-mute',
+  NotificationsTest: 'notifications:test',                 // fires a sample
+  NotificationsOnNew: 'notifications:on-new',              // main → renderer
+  NotificationsOnClickAction: 'notifications:click-action' // main → renderer
 } as const
 
 export type IpcChannelName = (typeof IpcChannel)[keyof typeof IpcChannel]

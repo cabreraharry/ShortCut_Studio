@@ -7,6 +7,7 @@ import type {
 import { isLocalProvider } from '@shared/providers'
 import { getLocAdmDb } from '../../db/connection'
 import { recordError } from '../../diagnostics/errorStore'
+import { notify } from '../../notifications/dispatch'
 import { redactSecrets } from '../../security/redact'
 import { providerCodeFromName } from '../providerName'
 import { claudeAdapter } from './claude'
@@ -282,10 +283,53 @@ export async function complete(req: LlmCompleteRequest): Promise<LlmCompleteResu
         feature: req.feature ?? null
       }
     })
+    // Notify only the three failure shapes that change user-visible state.
+    // Other errors (model-not-found, validation, transient adapter bugs) stay
+    // in the AppErrors ledger but don't pop a Windows toast — toast spam on
+    // every transient hiccup trains the user to ignore them.
+    const providerName = lookupProviderName(req.providerId)
+    if (/auth failed|missing API key|unauthorized|\b401\b|\b403\b/i.test(message)) {
+      notify({
+        severity: 'error',
+        source: 'llm',
+        title: `${providerName} auth failed`,
+        body: 'Update the API key in Settings → LLMs.',
+        action: { kind: 'navigate', target: '/llms' }
+      })
+    } else if (/\b429\b|rate.?limit|too many requests/i.test(message)) {
+      notify({
+        severity: 'warning',
+        source: 'llm',
+        title: `${providerName} rate-limited`,
+        body: 'Slowing down requests; topic generation may pause briefly.'
+      })
+    } else if (
+      /unreachable|ECONNREFUSED|ENOTFOUND|getaddrinfo|fetch failed|network\s*error/i.test(
+        message
+      )
+    ) {
+      notify({
+        severity: 'error',
+        source: 'llm',
+        title: `${providerName} unreachable`,
+        body: 'Topic generation is paused until the provider responds.',
+        action: { kind: 'navigate', target: '/llms' }
+      })
+    }
     return {
       ok: false,
       error: message,
       latencyMs: Date.now() - start
     }
+  }
+}
+
+function lookupProviderName(providerId: number | undefined): string {
+  if (providerId === undefined) return 'LLM provider'
+  try {
+    const row = loadProviderRow(providerId)
+    return row?.Provider_Name ?? 'LLM provider'
+  } catch {
+    return 'LLM provider'
   }
 }

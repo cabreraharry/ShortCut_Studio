@@ -8,6 +8,8 @@ import type {
 } from '@shared/types'
 import { getLocAdmDb } from '../db/connection'
 import { recordError } from '../diagnostics/errorStore'
+// Renamed import — this file already has a local `notify` for status broadcasts.
+import { notify as notifyUser } from '../notifications/dispatch'
 import { sisHealthCheck, sisSignIn, sisSignOut, sisVerifyToken } from './sisAuth'
 
 /**
@@ -255,6 +257,13 @@ export async function signIn(req: ExecEngineSignInRequest): Promise<ExecEngineSi
         message: lastError,
         context: { sisHost: status.config.sisHost, sisPort: status.config.sisPort }
       })
+      notifyUser({
+        severity: 'error',
+        source: 'execengine',
+        title: 'Peer sign-in failed',
+        body: lastError,
+        action: { kind: 'navigate', target: '/settings#execengine' }
+      })
       const next = buildStatus(
         'error',
         status.config,
@@ -286,6 +295,13 @@ export async function signIn(req: ExecEngineSignInRequest): Promise<ExecEngineSi
       message: lastError,
       stack: err instanceof Error ? err.stack : undefined,
       context: { sisHost: status.config.sisHost, sisPort: status.config.sisPort }
+    })
+    notifyUser({
+      severity: 'error',
+      source: 'execengine',
+      title: 'Peer sign-in failed',
+      body: lastError,
+      action: { kind: 'navigate', target: '/settings#execengine' }
     })
     const next = buildStatus(
       'error',

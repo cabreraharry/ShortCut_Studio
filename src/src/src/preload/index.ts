@@ -205,6 +205,32 @@ const api: ElectronAPI = {
       ipcRenderer.on(IpcChannel.UpdaterStatusChanged, listener)
       return () => ipcRenderer.removeListener(IpcChannel.UpdaterStatusChanged, listener)
     }
+  },
+  notifications: {
+    list: (query) => ipcRenderer.invoke(IpcChannel.NotificationsList, query),
+    markRead: (id) => ipcRenderer.invoke(IpcChannel.NotificationsMarkRead, id),
+    dismiss: (id) => ipcRenderer.invoke(IpcChannel.NotificationsDismiss, id),
+    unreadCount: () => ipcRenderer.invoke(IpcChannel.NotificationsUnreadCount),
+    getMute: () => ipcRenderer.invoke(IpcChannel.NotificationsGetMute),
+    setMute: (muted) => ipcRenderer.invoke(IpcChannel.NotificationsSetMute, muted),
+    test: () => ipcRenderer.invoke(IpcChannel.NotificationsTest),
+    onNew: (cb) => {
+      const listener = (
+        _e: Electron.IpcRendererEvent,
+        n: import('@shared/types').AppNotification
+      ): void => cb(n)
+      ipcRenderer.on(IpcChannel.NotificationsOnNew, listener)
+      return () => ipcRenderer.removeListener(IpcChannel.NotificationsOnNew, listener)
+    },
+    onClickAction: (cb) => {
+      const listener = (
+        _e: Electron.IpcRendererEvent,
+        action: import('@shared/types').NotificationAction
+      ): void => cb(action)
+      ipcRenderer.on(IpcChannel.NotificationsOnClickAction, listener)
+      return () =>
+        ipcRenderer.removeListener(IpcChannel.NotificationsOnClickAction, listener)
+    }
   }
 }
 

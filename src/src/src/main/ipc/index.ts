@@ -22,6 +22,7 @@ import { registerNetworkHandlers } from './network'
 import { registerExecEngineHandlers } from './execengine'
 import { registerComponentsHandlers } from './components'
 import { registerUpdaterHandlers } from './updater'
+import { registerNotificationHandlers } from './notifications'
 import { installIpcErrorTrap } from './installErrorTrap'
 
 export function registerIpcHandlers(): void {
@@ -52,4 +53,5 @@ export function registerIpcHandlers(): void {
   registerExecEngineHandlers()
   registerComponentsHandlers()
   registerUpdaterHandlers()
+  registerNotificationHandlers()
 }

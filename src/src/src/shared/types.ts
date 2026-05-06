@@ -671,6 +671,52 @@ export interface RecordRendererErrorPayload {
   context?: Record<string, unknown>
 }
 
+// ---------- Notification system (OS toasts + in-app center) ----------
+
+export type NotificationSeverity = 'error' | 'warning' | 'info'
+
+export type NotificationSource =
+  | 'worker'
+  | 'llm'
+  | 'updater'
+  | 'drive'
+  | 'execengine'
+  | 'main'
+  | 'renderer'
+
+/** Click-action payload. Currently navigation-only; extend when we add
+ *  more action kinds (run-command, restart-worker, etc.). */
+export interface NotificationAction {
+  kind: 'navigate'
+  /** HashRouter path including any anchor, e.g. '/settings#diagnostics'. */
+  target: string
+}
+
+export interface AppNotification {
+  id: number
+  ts: number                         // ms since epoch
+  severity: NotificationSeverity
+  source: NotificationSource
+  title: string
+  body: string | null
+  action: NotificationAction | null
+  readAt: number | null              // NULL when unread
+  dismissedAt: number | null         // NULL when still in the drawer
+}
+
+export interface NotificationListQuery {
+  limit?: number                     // default 50, max 200
+  offset?: number
+  unreadOnly?: boolean
+  includeDismissed?: boolean         // default false
+}
+
+export interface NotificationListResult {
+  rows: AppNotification[]
+  total: number
+  unreadCount: number
+}
+
 // ---------------------------------------------------------------------------
 // Updater (web-stub redownload + handoff)
 // ---------------------------------------------------------------------------

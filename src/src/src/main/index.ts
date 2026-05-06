@@ -7,8 +7,10 @@ import { initDatabase, closeDatabase } from './db/connection'
 import { initErrorsDb, closeErrorsDb } from './db/errorsConnection'
 import { runMigrations } from './db/migrations'
 import { startWorkerSupervisor, stopAllWorkersAsync } from './workers/supervisor'
+import { startDriveWatcher, stopDriveWatcher } from './drives/watcher'
 import { startLlmBridgeServer, stopLlmBridgeServer } from './llm/bridgeServer'
 import { recordError } from './diagnostics/errorStore'
+import { notify } from './notifications/dispatch'
 import { initAuthState, verifyPersistedToken } from './execengine/authState'
 import { startUpdater, stopUpdater } from './updater'
 import { IpcChannel } from '@shared/ipc-channels'
@@ -152,8 +154,16 @@ async function bootstrap(): Promise<void> {
       message: `LLM bridge failed to start: ${message}`,
       context: { likelyCause: 'port 45123 in use by another process' }
     })
+    notify({
+      severity: 'error',
+      source: 'main',
+      title: 'LLM bridge port :45123 in use',
+      body: 'Workers cannot reach LLM. Check for another running ShortCut Studio instance, then restart.',
+      action: { kind: 'navigate', target: '/settings#diagnostics' }
+    })
   }
   startWorkerSupervisor()
+  startDriveWatcher()
   // Fire-and-forget: confirm any persisted token is still valid against SIS.
   // We don't block boot on this — UI surfaces 'connected' optimistically and
   // downgrades to 'expired' if SIS rejects.
@@ -199,6 +209,7 @@ async function shutdownAndQuit(): Promise<void> {
   markQuitting()
   destroyTray()
   stopUpdater()
+  stopDriveWatcher()
   // killWithEscalation gives each worker up to 2 s to exit cleanly on
   // SIGTERM before taskkill /F /T. Run in parallel — three workers
   // shutting down independently is faster than serially.

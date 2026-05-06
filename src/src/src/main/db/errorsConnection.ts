@@ -54,8 +54,13 @@ export function closeErrorsDb(): void {
 }
 
 /**
- * Idempotent schema for errors.db. Single table + two indexes; small enough
- * to inline rather than split into a separate migrations module.
+ * Idempotent schema for errors.db. AppErrors is the diagnostic ledger
+ * (every IPC throw, worker stderr, LLM provider error). Notifications is
+ * the user-curated event surface (the bell icon's drawer + Windows OS
+ * toasts) — same DB on purpose: both are runtime event captures, both
+ * benefit from the WAL+synchronous=NORMAL profile, both are safe to
+ * include in a debug-bundle export, and a wedged loc_adm.db doesn't take
+ * either down.
  */
 function runErrorsMigrations(db: Database.Database): void {
   db.exec(`
@@ -72,5 +77,21 @@ function runErrorsMigrations(db: Database.Database): void {
 
     CREATE INDEX IF NOT EXISTS idx_AppErrors_ts ON AppErrors(ts DESC);
     CREATE INDEX IF NOT EXISTS idx_AppErrors_source ON AppErrors(source, ts DESC);
+
+    CREATE TABLE IF NOT EXISTS Notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ts INTEGER NOT NULL,
+      severity TEXT NOT NULL,           -- 'error' | 'warning' | 'info'
+      source TEXT NOT NULL,             -- 'worker' | 'llm' | 'updater' | 'drive' | 'execengine' | 'main' | 'renderer'
+      title TEXT NOT NULL,
+      body TEXT,
+      action TEXT,                      -- JSON: NotificationAction | null
+      readAt INTEGER,                   -- NULL = unread
+      dismissedAt INTEGER               -- NULL = visible in drawer
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_Notifications_ts ON Notifications(ts DESC);
+    CREATE INDEX IF NOT EXISTS idx_Notifications_unread
+      ON Notifications(readAt, dismissedAt, ts DESC);
   `)
 }

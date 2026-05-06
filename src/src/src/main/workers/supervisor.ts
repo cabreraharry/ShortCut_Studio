@@ -3,6 +3,7 @@ import { app, net } from 'electron'
 import type { WorkerStatus } from '@shared/types'
 import { sclDataRootDir } from '../db/scl-folder'
 import { recordError } from '../diagnostics/errorStore'
+import { notify } from '../notifications/dispatch'
 import { LLM_BRIDGE_PORT, getBridgeToken } from '../llm/bridgeServer'
 import {
   SUPERVISED_WORKERS,
@@ -208,6 +209,19 @@ function spawnWorker(handle: WorkerHandle): void {
           lastLogs: handle.logBuffer.slice(-20)
         }
       })
+      // Soft notify — the supervisor is about to auto-restart, so this
+      // is an information event ("we noticed and are recovering") not a
+      // hard failure yet. Hard failure (give-up) fires below.
+      const willRetry = handle.restartCount < MAX_RESTART_ATTEMPTS
+      if (willRetry) {
+        notify({
+          severity: 'warning',
+          source: 'worker',
+          title: `${cfg.name} restarted`,
+          body: `Crashed with code ${code}; auto-recovering.`,
+          action: { kind: 'navigate', target: '/settings#diagnostics' }
+        })
+      }
     }
     if (handle.manualRestartInProgress) {
       // restartWorker() killed this child intentionally and will spawn the
@@ -235,6 +249,13 @@ function spawnWorker(handle: WorkerHandle): void {
         category: cfg.name,
         message: `gave up after ${handle.restartCount} restarts`,
         context: { code, restartCount: handle.restartCount }
+      })
+      notify({
+        severity: 'error',
+        source: 'worker',
+        title: `${cfg.name} stopped`,
+        body: `Crashed too many times; manual restart needed in Diagnostics.`,
+        action: { kind: 'navigate', target: '/settings#diagnostics' }
       })
     }
   })
