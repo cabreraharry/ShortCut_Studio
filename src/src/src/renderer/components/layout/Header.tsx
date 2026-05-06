@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { APP_VERSION, APP_BUILD_DATE } from '@/lib/app-info'
 import { AboutDialog } from './AboutDialog'
+import { NotificationBell } from '@/components/notifications/NotificationBell'
 import type { DataSource, DataSourceState, UpdaterStatus } from '@shared/types'
 
 // Persist the theme toggle across restarts. Renderer-only state, so
@@ -86,6 +87,7 @@ export function Header() {
       <div className="flex items-center gap-2">
         <UpdateAvailablePill />
         <DataSourcePill />
+        <NotificationBell />
         <IconButton
           tip="About ShortCut Studio"
           onClick={() => setAboutOpen(true)}

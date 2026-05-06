@@ -36,6 +36,7 @@ import { ErrorsCard } from './ErrorsCard'
 import { ComponentsCard } from './ComponentsCard'
 import { StartupCard } from './StartupCard'
 import { UpdatesCard } from './UpdatesCard'
+import { NotificationsCard } from './NotificationsCard'
 
 export default function SettingsPage() {
   return (
@@ -51,6 +52,7 @@ export default function SettingsPage() {
       <AdminCard />
       <UpdatesCard />
       <StartupCard />
+      <NotificationsCard />
       <ExecEngineCard />
       <ComponentsCard />
       <ErrorsCard />

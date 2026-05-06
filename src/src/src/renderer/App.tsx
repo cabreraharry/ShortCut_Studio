@@ -18,10 +18,12 @@ import GettingStartedPage from './features/getting-started/GettingStartedPage'
 import SetupWizard from './features/setup/SetupWizard'
 import { FirstRunGuard } from './features/setup/FirstRunGuard'
 import { WelcomeOnLaunchDialog } from './features/welcome/WelcomeOnLaunchDialog'
+import { NotificationActionRouter } from './components/notifications/NotificationActionRouter'
 
 export default function App() {
   return (
     <TooltipProvider delayDuration={300} skipDelayDuration={100}>
+      <NotificationActionRouter />
       <AppShell>
         <FirstRunGuard>
         <RouteErrorBoundary>
