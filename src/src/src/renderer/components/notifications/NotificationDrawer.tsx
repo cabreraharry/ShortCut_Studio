@@ -73,23 +73,12 @@ export function NotificationDrawer({ open, onOpenChange }: Props) {
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="flex w-full flex-col p-0 sm:max-w-sm">
         <SheetHeader className="space-y-2 border-b border-border bg-card/60 px-4 py-3">
-          <div className="flex items-center justify-between">
+          {/* pr-8 leaves room for the Sheet's built-in X close button at top-right;
+              without it, anything justify-end inside this row would slide under the X. */}
+          <div className="flex items-center justify-between pr-8">
             <SheetTitle className="text-base">Notifications</SheetTitle>
-            <button
-              type="button"
-              onClick={() => setMute.mutate(!muted)}
-              className="flex items-center gap-1.5 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-accent/60"
-              title={
-                muted
-                  ? 'Popups are paused — click to resume'
-                  : 'Pause popup notifications (history keeps recording)'
-              }
-            >
-              {muted ? <BellOff className="h-3.5 w-3.5" /> : <Bell className="h-3.5 w-3.5" />}
-              {muted ? 'Paused' : 'Pause popups'}
-            </button>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => markRead.mutate('all')}
@@ -107,6 +96,19 @@ export function NotificationDrawer({ open, onOpenChange }: Props) {
             >
               <Trash2 className="h-3 w-3" />
               Clear all
+            </button>
+            <button
+              type="button"
+              onClick={() => setMute.mutate(!muted)}
+              className="ml-auto flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-muted-foreground hover:bg-accent/60"
+              title={
+                muted
+                  ? 'Popups are paused — click to resume'
+                  : 'Pause popup notifications (history keeps recording)'
+              }
+            >
+              {muted ? <BellOff className="h-3 w-3" /> : <Bell className="h-3 w-3" />}
+              {muted ? 'Paused' : 'Pause popups'}
             </button>
           </div>
         </SheetHeader>
