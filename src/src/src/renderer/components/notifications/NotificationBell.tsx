@@ -38,7 +38,7 @@ export function NotificationBell() {
         <IconButton
           tip={
             muted
-              ? 'Notifications (OS toasts muted)'
+              ? 'Notifications (popups paused)'
               : unreadCount > 0
                 ? `${unreadCount} unread notifications`
                 : 'Notifications'

@@ -79,10 +79,14 @@ export function NotificationDrawer({ open, onOpenChange }: Props) {
               type="button"
               onClick={() => setMute.mutate(!muted)}
               className="flex items-center gap-1.5 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-accent/60"
-              title={muted ? 'OS toasts muted — click to unmute' : 'Mute OS toasts'}
+              title={
+                muted
+                  ? 'Popups are paused — click to resume'
+                  : 'Pause popup notifications (history keeps recording)'
+              }
             >
               {muted ? <BellOff className="h-3.5 w-3.5" /> : <Bell className="h-3.5 w-3.5" />}
-              {muted ? 'Muted' : 'Mute'}
+              {muted ? 'Paused' : 'Pause popups'}
             </button>
           </div>
           <div className="flex items-center gap-2">

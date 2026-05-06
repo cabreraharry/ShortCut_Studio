@@ -32,10 +32,10 @@ export function NotificationsCard() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['notifications'] })
       toast({
-        title: 'Test notification fired',
+        title: 'Sent a test notification',
         description: muted
-          ? 'OS toast suppressed (currently muted). Check the bell icon for the in-app entry.'
-          : 'Look for a Windows toast in the bottom-right corner. If you do not see one, enable ShortCut Studio in Windows → Settings → System → Notifications.'
+          ? "Popup is hidden because they're paused right now. Open the bell icon up top to see the entry."
+          : 'Look in the bottom-right corner of your screen for a popup. If nothing appears, allow ShortCut Studio in Windows → Settings → System → Notifications.'
       })
     }
   })
@@ -52,32 +52,34 @@ export function NotificationsCard() {
           Notifications
         </CardTitle>
         <CardDescription>
-          OS toasts pop up in the Windows notification area when something
-          important happens — worker crash, LLM provider error, drive
-          disappeared, update available. The bell icon in the header keeps a
-          rolling history of the last 500 events.
+          Get a popup in the bottom-right corner of your screen when something
+          important happens — a worker stops, an LLM provider fails, a folder
+          disappears, an update is ready. Popups appear even when you&rsquo;re
+          working in another app. The bell icon in the header keeps a history
+          of the last 500 events.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
-            <p className="text-sm font-medium">Pause OS toasts</p>
+            <p className="text-sm font-medium">Show popup notifications</p>
             <p className="text-xs text-muted-foreground">
-              In-app entries keep recording so you can review them later. Useful
-              during a long focus session.
+              When off, popups stop appearing on screen but the bell icon keeps
+              recording events so you can review them later. Useful during a
+              long focus session.
             </p>
           </div>
           <Switch
-            checked={muted}
-            onCheckedChange={(next) => setMute.mutate(next)}
-            aria-label="Mute OS toasts"
+            checked={!muted}
+            onCheckedChange={(showPopups) => setMute.mutate(!showPopups)}
+            aria-label="Show popup notifications"
           />
         </div>
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
-            <p className="text-sm font-medium">Test notification</p>
+            <p className="text-sm font-medium">Send a test notification</p>
             <p className="text-xs text-muted-foreground">
-              Fire a sample event to confirm Windows is showing toasts. The
+              Sends a sample popup to confirm Windows is showing them. The
               first time, Windows may ask you to allow ShortCut Studio in
               System → Notifications.
             </p>
@@ -88,7 +90,7 @@ export function NotificationsCard() {
             onClick={() => fireTest.mutate()}
             disabled={fireTest.isPending}
           >
-            Fire test
+            Send test
           </Button>
         </div>
       </CardContent>

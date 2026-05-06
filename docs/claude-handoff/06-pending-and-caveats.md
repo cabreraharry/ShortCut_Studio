@@ -2,6 +2,31 @@
 
 If you're a future Claude session (or a human developer) about to add a feature or fix a bug, **read this before touching anything**. These are the traps.
 
+## Notification system (2026-05-06)
+
+App-wide notification surface. Two layers:
+
+- **Windows popup notifications** — Electron `Notification` API fires from a single main-process `notify()` dispatcher at [src/main/notifications/dispatch.ts](../../src/src/src/main/notifications/dispatch.ts). Click on a popup focuses the window and broadcasts a `notifications:click-action` event for the renderer to navigate.
+- **In-app history** — bell icon in [Header.tsx](../../src/src/src/renderer/components/layout/Header.tsx) opens a Sheet drawer listing the last 500 events with severity icons, mark-read / dismiss / clear-all actions, and a "Pause popups" toggle. Backed by a new `Notifications` table in `errors.db` (alongside `AppErrors` so a debug-bundle export can ship both surfaces without touching `loc_adm.db` secrets). Mute state in `AdminData.NotificationsMuted` (loc_adm.db).
+
+Wired event sites (9 must-notify events):
+
+| Event | File | Severity |
+|---|---|---|
+| Worker crashed (auto-restarting) | [supervisor.ts](../../src/src/src/main/workers/supervisor.ts) | warning |
+| Worker stopped (gave up after MAX_RESTART_ATTEMPTS) | supervisor.ts | error |
+| LLM provider unreachable / auth failed / rate-limited | [completion/index.ts](../../src/src/src/main/llm/completion/index.ts) | error / error / warning |
+| Update available / download failed | [updater/index.ts](../../src/src/src/main/updater/index.ts) | info / error |
+| LLM bridge port :45123 collision at boot | [main/index.ts](../../src/src/src/main/index.ts) | error |
+| ExecEngine sign-in failed | [authState.ts](../../src/src/src/main/execengine/authState.ts) | error |
+| Tracked folder disappeared / restored | [drives/watcher.ts](../../src/src/src/main/drives/watcher.ts) | error / info |
+
+Smoke-tested live on 2026-05-06: bell renders, "Send test" fires a real Windows popup, drive watcher caught a real missing folder on first boot (proving end-to-end wiring works in production), `taskkill /F /IM root_watchdog.exe` produced the auto-restart popup within ~5s. The "Folder unavailable" body showed the tracked path with double-backslashes (`C:\\Users\\...`) — that's a Folder.Path storage bug, not a notification bug; deferred for a follow-up task.
+
+Deferred event wirings (pattern is identical, just more `notify()` calls): renderer-uncaught errors, scan-job started / finished, OCR_Process state changes, completion timeouts, IPFS quota reached, model-not-found.
+
+Commits: `0e89f93` backend + IPC + wiring; `5a610de` UI; `<TBD>` UX copy pass after user feedback ("toast" → "popup notification", positive-sense toggle).
+
 ## Production-readiness review chain (2026-05-06, complete)
 
 Thirteen commits of focused security + reliability hardening, capped by a three-tier reviewer escalation. Chain summary:
