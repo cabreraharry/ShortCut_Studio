@@ -283,10 +283,14 @@ export async function complete(req: LlmCompleteRequest): Promise<LlmCompleteResu
         feature: req.feature ?? null
       }
     })
-    // Notify only the three failure shapes that change user-visible state.
-    // Other errors (model-not-found, validation, transient adapter bugs) stay
-    // in the AppErrors ledger but don't pop a Windows toast — toast spam on
+    // Notify only the failure shapes that change user-visible state. Other
+    // errors (model-not-found, validation, transient adapter bugs) stay in
+    // the AppErrors ledger but don't pop a Windows toast — toast spam on
     // every transient hiccup trains the user to ignore them.
+    //
+    // Order matters: timeout is checked before unreachable because some
+    // upstream errors carry both phrasings ("network error: timed out") and
+    // "request took too long" is the more useful signal.
     const providerName = lookupProviderName(req.providerId)
     if (/auth failed|missing API key|unauthorized|\b401\b|\b403\b/i.test(message)) {
       notify({
@@ -303,8 +307,23 @@ export async function complete(req: LlmCompleteRequest): Promise<LlmCompleteResu
         title: `${providerName} rate-limited`,
         body: 'Slowing down requests; topic generation may pause briefly.'
       })
+    } else if (/\b408\b|Request timed out|request timeout/i.test(message)) {
+      // Pinned to the exact phrasing httpJson throws ("Request timed out
+      // after Xms: <url>") plus the HTTP 408 status code. The bare phrase
+      // "timed out" is intentionally avoided — Node's net layer surfaces
+      // "connection timed out" on a downed daemon (Ollama / LM Studio not
+      // running), which is semantically the unreachable branch below, not
+      // a slow-but-reachable provider. Wrong guidance there would tell the
+      // user to "pick a faster model" when the daemon is just stopped.
+      notify({
+        severity: 'warning',
+        source: 'llm',
+        title: `${providerName} took too long`,
+        body: 'The request timed out before a response. Try again, or pick a faster model on the LLMs page.',
+        action: { kind: 'navigate', target: '/llms' }
+      })
     } else if (
-      /unreachable|ECONNREFUSED|ENOTFOUND|getaddrinfo|fetch failed|network\s*error/i.test(
+      /unreachable|ECONNREFUSED|ENOTFOUND|getaddrinfo|fetch failed|network\s*error|connection timed out/i.test(
         message
       )
     ) {

@@ -6,6 +6,11 @@ import {
   listErrors,
   recordError
 } from '../diagnostics/errorStore'
+import { notify } from '../notifications/dispatch'
+import {
+  isBenignRendererError,
+  shouldNotifyRendererError
+} from '../notifications/rendererThrottle'
 import type {
   ErrorListQuery,
   ErrorListResult,
@@ -84,14 +89,29 @@ export function registerDiagnosticsHandlers(): void {
           context = { truncated: true, note: 'context not serialisable' }
         }
       }
+      const category = typeof payload.category === 'string' ? payload.category : null
       recordError({
         source: 'renderer',
         severity: 'error',
-        category: typeof payload.category === 'string' ? payload.category : null,
+        category,
         message,
         stack,
         context
       })
+
+      // Notify the user only when we'd actually want them to look. AppErrors
+      // (above) is always written; this is the "popup-worthy" subset.
+      if (!isBenignRendererError(message) && shouldNotifyRendererError(category, message)) {
+        notify({
+          severity: 'error',
+          source: 'main',
+          title: 'Something went wrong',
+          // Body uses the raw message rather than category so the user sees
+          // what broke. The full stack lives in Settings → Diagnostics.
+          body: message,
+          action: { kind: 'navigate', target: '/settings#diagnostics' }
+        })
+      }
     }
   )
 }
