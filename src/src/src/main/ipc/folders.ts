@@ -1,8 +1,10 @@
 import { dialog, ipcMain } from 'electron'
 import { existsSync, statSync } from 'node:fs'
+import { isAbsolute } from 'node:path'
 import { IpcChannel } from '@shared/ipc-channels'
 import { getLocAdmDb } from '../db/connection'
 import { getFolderHealthReal } from '../db/scl-folder'
+import { canonicalize } from '../security/safePath'
 import { getMode } from './mode'
 import { enqueueScan } from '../workers/scanRunner'
 import type { FolderRow } from '@shared/types'
@@ -14,6 +16,26 @@ function assertFolder(path: string): void {
   if (!statSync(path).isDirectory()) {
     throw new Error(`VALIDATION: Not a directory — ${path}`)
   }
+}
+
+/**
+ * Canonicalize a renderer-supplied folder path before it touches the DB.
+ *
+ * - canonicalize() (security/safePath) collapses doubled separators, rejects
+ *   UNC shares, NUL bytes, and empty strings. Solves the historical bug
+ *   where a paste like `C:\\Users\\foo` (literal doubled `\`) passed
+ *   existsSync (Windows FS layer normalises) and got stored verbatim,
+ *   poisoning notification bodies + scan logs.
+ * - The isAbsolute() guard rejects bare-relative (`Documents\foo`) and
+ *   drive-relative (`C:foo`) inputs that path.resolve() would silently
+ *   anchor to process.cwd() — different in dev vs. packaged, and the
+ *   resulting path may even satisfy existsSync by accident.
+ */
+function canonicalizeFolderPath(input: string): string {
+  if (!isAbsolute(input)) {
+    throw new Error(`VALIDATION: Path must be absolute — ${input}`)
+  }
+  return canonicalize(input)
 }
 
 interface FolderDbRow {
@@ -72,7 +94,8 @@ export function registerFolderHandlers(): void {
         lastUpdCt: number
       }> = []
       const tx = db.transaction((items: string[]) => {
-        for (const p of items) {
+        for (const raw of items) {
+          const p = canonicalizeFolderPath(raw)
           let include: 'Y' | 'N'
           if (forceInclude) {
             include = forceInclude
@@ -147,8 +170,9 @@ export function registerFolderHandlers(): void {
   })
 
   ipcMain.handle(IpcChannel.FoldersUpdatePath, (_evt, id: number, newPath: string) => {
-    assertFolder(newPath)
-    getLocAdmDb().prepare('UPDATE Folder SET Path = ? WHERE ID = ?').run(newPath, id)
+    const canonical = canonicalizeFolderPath(newPath)
+    assertFolder(canonical)
+    getLocAdmDb().prepare('UPDATE Folder SET Path = ? WHERE ID = ?').run(canonical, id)
   })
 
   // Toggle the existing row's Include flag. Used by the Switch on each

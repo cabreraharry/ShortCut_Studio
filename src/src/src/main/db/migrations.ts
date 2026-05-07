@@ -1,3 +1,4 @@
+import { isAbsolute, resolve as resolvePath } from 'node:path'
 import { getLocAdmDb } from './connection'
 
 /**
@@ -280,6 +281,49 @@ export function runMigrations(): void {
     ).run()
   } catch {
     // column already exists
+  }
+
+  // Canonicalize Folder.Path. Older renderer code paths (the inline path-edit
+  // input on FoldersPage in particular) accepted free-form text and stored it
+  // verbatim, so installs in the wild may carry rows like `C:\\Users\\foo`
+  // (literal doubled separators). Windows still resolves those at the FS
+  // layer — the corruption is invisible until a downstream surface
+  // interpolates the string (drive watcher's notification body, scan logs).
+  // Repair pass: walk every row, compute resolve(Path); if it differs,
+  // UPDATE. Idempotent — a row already in canonical form is a no-op.
+  // Cheap enough at boot since Folder rarely exceeds a few dozen rows.
+  //
+  // Defensive constraints (avoid making bad data worse):
+  //   - Non-absolute rows are skipped — resolve() would anchor them to
+  //     process.cwd() which is the app dir in packaged builds and the
+  //     repo dir in dev, neither of which is what the user meant.
+  //   - UNC rows (`\\server\share`) are skipped — resolve() leaves them
+  //     intact but our IPC writers reject them, so a row already in this
+  //     state is something we can't repair from this side.
+  //   - Each row's update runs in a try/catch — a single odd row must
+  //     not roll back the whole migration transaction (which would also
+  //     undo the CREATE TABLE statements above and leave the DB unbootable).
+  try {
+    const folderRows = db
+      .prepare('SELECT ID, Path FROM Folder')
+      .all() as Array<{ ID: number; Path: string }>
+    const updateFolderPath = db.prepare('UPDATE Folder SET Path = ? WHERE ID = ?')
+    for (const row of folderRows) {
+      try {
+        if (typeof row.Path !== 'string' || row.Path.length === 0) continue
+        if (row.Path.startsWith('\\\\') || row.Path.startsWith('//')) continue
+        if (!isAbsolute(row.Path)) continue
+        const canonical = resolvePath(row.Path)
+        if (canonical !== row.Path) updateFolderPath.run(canonical, row.ID)
+      } catch {
+        // Pathological row (NUL byte, etc.) — leave it for a human to
+        // investigate rather than aborting every other migration.
+      }
+    }
+  } catch {
+    // Folder table missing / unreadable — the CREATE above either succeeded
+    // (so this can't happen) or failed (in which case the whole tx is about
+    // to roll back anyway). Either way, nothing to repair.
   }
   })()
 }
