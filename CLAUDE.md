@@ -275,6 +275,7 @@ When touching these, fix the root rather than working around it:
 
 - **Always edit in `src/src/`.** No other code-bearing folder exists post-cleanup.
 - **The plan file** is the source of truth for what ships in v1. Update it if scope changes.
+- **Project-scoped plans** live at [.claude/plans/](.claude/plans/) (gitignored — not pushed). Browse the directory directly to find prior planning context. Filenames are descriptive (e.g. `scs-polaris-dual-stack.md`, `notifications-system.md`); after writing a new plan, rename it from the harness-generated `i-think-we-should-foo-bar.md` form to a kebab-case topic name so future-you can find it.
 - **Memory files** live at `C:/Users/harrycabrera/.claude/projects/D--Client-Side-Project/memory/` and persist across sessions.
 - **Don't commit `*.db`** (gitignored). Schema changes in `migrations.ts` ARE committed.
 - **Windows-only assumptions** are baked in (`.exe` workers, `taskkill`, NSIS). Don't attempt cross-platform without explicit ask.
